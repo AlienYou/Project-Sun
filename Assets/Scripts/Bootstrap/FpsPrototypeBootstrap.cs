@@ -18,17 +18,19 @@ namespace ProjectSun.FPS.Bootstrap
         private static readonly Color WallColor = new Color(0.11f, 0.16f, 0.21f);
         private static readonly Color TargetColor = new Color(0.11f, 0.6f, 0.82f);
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        // [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void CreateIfMissing()
         {
+            // A scene built with the Combat Slice builder owns its composition explicitly.
+            if (FindObjectOfType<CombatSliceSceneInstaller>() != null) return;
             if (FindObjectOfType<FpsPrototypeBootstrap>() != null) return;
             new GameObject("FPS Prototype Bootstrap").AddComponent<FpsPrototypeBootstrap>();
         }
 
         private void Awake()
         {
-            Application.targetFrameRate = 120;
-            BuildRange();
+            // Application.targetFrameRate = 120;
+            // BuildRange();
         }
 
         private void BuildRange()

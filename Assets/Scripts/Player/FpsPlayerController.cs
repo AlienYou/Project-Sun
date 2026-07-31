@@ -95,7 +95,9 @@ namespace ProjectSun.FPS.Player
 
         private void Move()
         {
-            MoveInput = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
+            MoveInput = new Vector2(
+                (Input.GetKey(KeyCode.D) ? 1f : 0f) - (Input.GetKey(KeyCode.A) ? 1f : 0f),
+                (Input.GetKey(KeyCode.W) ? 1f : 0f) - (Input.GetKey(KeyCode.S) ? 1f : 0f));
             MoveInput = Vector2.ClampMagnitude(MoveInput, 1f);
             bool crouching = Input.GetKey(KeyCode.C) || Input.GetKey(KeyCode.LeftControl);
             IsSprinting = Input.GetKey(KeyCode.LeftShift) && MoveInput.y > 0.1f && !crouching;
@@ -104,7 +106,7 @@ namespace ProjectSun.FPS.Player
             Vector3 move = (transform.right * MoveInput.x + transform.forward * MoveInput.y) * (speed * speedMultiplier);
             if (characterController.isGrounded && verticalVelocity < 0f)
                 verticalVelocity = -2f;
-            if (characterController.isGrounded && Input.GetButtonDown("Jump"))
+            if (characterController.isGrounded && Input.GetKeyDown(KeyCode.Space))
                 verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
             verticalVelocity += gravity * Time.deltaTime;
             move.y = verticalVelocity;

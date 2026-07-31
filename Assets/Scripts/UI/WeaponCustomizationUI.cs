@@ -22,7 +22,8 @@ namespace ProjectSun.FPS.UI
             weapon = hitscanWeapon;
             player = controller;
             abilities = abilityController;
-            CreateOptions();
+            if (options.Count == 0)
+                CreateOptions();
         }
 
         private void Update()
@@ -98,9 +99,9 @@ namespace ProjectSun.FPS.UI
         private void SetOpen(bool open)
         {
             isOpen = open;
-            player.SetGameplayInputEnabled(!open);
-            weapon.SetGameplayInputEnabled(!open);
-            abilities.SetGameplayInputEnabled(!open);
+            if (player != null) player.SetGameplayInputEnabled(!open);
+            if (weapon != null) weapon.SetGameplayInputEnabled(!open);
+            if (abilities != null) abilities.SetGameplayInputEnabled(!open);
         }
 
         private void CreateOptions()

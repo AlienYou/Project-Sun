@@ -24,6 +24,12 @@ namespace ProjectSun.FPS.World
                 material = cachedRenderer.material;
                 baseColor = ReadColor(material);
             }
+            if (health == null)
+            {
+                Debug.LogError($"{name} requires a Health component. Disable this target until its prefab is repaired.", this);
+                enabled = false;
+                return;
+            }
             health.Damaged += OnDamaged;
             health.Died += OnDied;
         }
@@ -37,7 +43,7 @@ namespace ProjectSun.FPS.World
 
         private void Update()
         {
-            if (health.IsAlive)
+            if (health != null && health.IsAlive)
                 transform.Rotate(0f, 24f * Time.deltaTime, 0f, Space.World);
         }
 
