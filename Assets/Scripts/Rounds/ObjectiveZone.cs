@@ -1,5 +1,6 @@
 using System;
 using ProjectSun.FPS.Player;
+using ProjectSun.FPS.Input;
 using UnityEngine;
 
 namespace ProjectSun.FPS.Rounds
@@ -17,6 +18,7 @@ namespace ProjectSun.FPS.Rounds
         private bool available;
         private bool activated;
         private float activationProgress;
+        private FpsInput playerInput;
 
         public string SiteLabel => siteLabel;
         public bool IsPlayerInside => playerInside;
@@ -59,7 +61,7 @@ namespace ProjectSun.FPS.Rounds
                 return;
             }
 
-            if (!Input.GetKey(KeyCode.F))
+            if (playerInput == null || !playerInput.GameplayEnabled || !playerInput.IsHeld(FpsBinding.Interact))
             {
                 if (activationProgress > 0f)
                 {
@@ -83,6 +85,7 @@ namespace ProjectSun.FPS.Rounds
         {
             if (other.GetComponentInParent<FpsPlayerController>() == null) return;
             playerInside = true;
+            playerInput = other.GetComponentInParent<FpsInput>();
             RefreshIndicator();
         }
 
@@ -90,6 +93,7 @@ namespace ProjectSun.FPS.Rounds
         {
             if (other.GetComponentInParent<FpsPlayerController>() == null) return;
             playerInside = false;
+            playerInput = null;
             activationProgress = 0f;
             RefreshIndicator();
         }

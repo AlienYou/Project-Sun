@@ -2,6 +2,7 @@ using ProjectSun.FPS.Abilities;
 using ProjectSun.FPS.Bootstrap;
 using ProjectSun.FPS.Core;
 using ProjectSun.FPS.Player;
+using ProjectSun.FPS.Input;
 using ProjectSun.FPS.Rounds;
 using ProjectSun.FPS.UI;
 using ProjectSun.FPS.Weapons;
@@ -112,6 +113,7 @@ namespace ProjectSun.FPS.Editor
             characterController.radius = 0.32f;
             characterController.center = new Vector3(0f, 0.9f, 0f);
             Health health = root.AddComponent<Health>();
+            root.AddComponent<FpsInput>();
             FpsPlayerController player = root.AddComponent<FpsPlayerController>();
             HitscanWeapon weapon = root.AddComponent<HitscanWeapon>();
             FpsAbilityController abilities = root.AddComponent<FpsAbilityController>();
@@ -177,6 +179,7 @@ namespace ProjectSun.FPS.Editor
             systems.transform.SetParent(parent);
             FpsHud hud = systems.AddComponent<FpsHud>();
             WeaponCustomizationUI customization = systems.AddComponent<WeaponCustomizationUI>();
+            systems.AddComponent<FpsSettingsMenu>();
             RoundManager roundManager = systems.AddComponent<RoundManager>();
             roundManager.SetObjectives(objectives);
             CombatSliceSceneInstaller installer = systems.AddComponent<CombatSliceSceneInstaller>();

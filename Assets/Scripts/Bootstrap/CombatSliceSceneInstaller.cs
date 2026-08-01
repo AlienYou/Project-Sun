@@ -36,6 +36,9 @@ namespace ProjectSun.FPS.Bootstrap
                 hud.Configure(playerInstaller.Weapon, playerInstaller.Abilities, playerInstaller.Health, roundManager);
             if (customization != null)
                 customization.Configure(playerInstaller.Weapon, playerInstaller.Player, playerInstaller.Abilities, loadoutCatalog);
+            FpsSettingsMenu settings = GetComponent<FpsSettingsMenu>();
+            if (settings == null) settings = gameObject.AddComponent<FpsSettingsMenu>();
+            settings.Configure(playerInstaller.Player, playerInstaller.Weapon, playerInstaller.Abilities);
         }
     }
 }

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using ProjectSun.FPS.Abilities;
+using ProjectSun.FPS.Input;
 using ProjectSun.FPS.Player;
 using ProjectSun.FPS.Weapons;
 using UnityEngine;
@@ -13,6 +14,7 @@ namespace ProjectSun.FPS.UI
         private HitscanWeapon weapon;
         private FpsPlayerController player;
         private FpsAbilityController abilities;
+        private FpsInput input;
         private bool ownsRuntimeOptions;
         private bool isOpen;
         private GUIStyle titleStyle;
@@ -23,6 +25,7 @@ namespace ProjectSun.FPS.UI
         {
             weapon = hitscanWeapon;
             player = controller;
+            input = player != null ? player.Input : null;
             abilities = abilityController;
             if (catalog != null && catalog.Attachments.Count > 0)
             {
@@ -37,7 +40,7 @@ namespace ProjectSun.FPS.UI
 
         private void Update()
         {
-            if (Input.GetKeyDown(KeyCode.Tab))
+            if (input != null && (isOpen || input.GameplayEnabled) && !input.IsRebinding && input.WasPressed(FpsBinding.Loadout))
                 SetOpen(!isOpen);
         }
 

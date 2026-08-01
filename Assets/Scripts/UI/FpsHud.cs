@@ -46,7 +46,7 @@ namespace ProjectSun.FPS.UI
             }
             GUI.Label(new Rect(28, 50, 550, 24),
                 $"[Q] DASH {Cooldown(abilities.DashCooldownRemaining)}    [E] FOCUS {Cooldown(abilities.FocusCooldownRemaining, abilities.IsFocused)}", textStyle);
-            GUI.Label(new Rect(28, 76, 680, 24), "WASD move  SHIFT sprint  SPACE jump  C crouch  RMB aim  R reload  F interact  TAB loadout", textStyle);
+            GUI.Label(new Rect(28, 76, 760, 24), "WASD move  SHIFT sprint  SPACE jump  C crouch  RMB aim  R reload  F interact  TAB loadout  O settings", textStyle);
 
             GUI.Label(new Rect(width * 0.5f - 10, height * 0.5f - 13, 20, 26), "+", largeTextStyle);
         }

@@ -1,6 +1,7 @@
 using ProjectSun.FPS.Abilities;
 using ProjectSun.FPS.Core;
 using ProjectSun.FPS.Player;
+using ProjectSun.FPS.Input;
 using ProjectSun.FPS.Weapons;
 using UnityEngine;
 
@@ -40,7 +41,9 @@ namespace ProjectSun.FPS.Bootstrap
             if (initialized || player == null || weapon == null || abilities == null || playerCamera == null || muzzle == null)
                 return;
 
-            player.Configure(playerCamera.transform);
+            if (GetComponent<FpsInput>() == null)
+                gameObject.AddComponent<FpsInput>();
+            player.Configure(playerCamera.transform, playerCamera);
             weapon.Configure(playerCamera, muzzle);
             abilities.Configure(player, weapon);
             if (GetComponent<PlayerRespawnController>() == null)

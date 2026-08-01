@@ -1,5 +1,6 @@
 using System.Collections;
 using ProjectSun.FPS.Player;
+using ProjectSun.FPS.Input;
 using ProjectSun.FPS.Weapons;
 using UnityEngine;
 
@@ -17,6 +18,7 @@ namespace ProjectSun.FPS.Abilities
         [SerializeField] private float focusSpreadMultiplier = 0.45f;
 
         private FpsPlayerController player;
+        private FpsInput input;
         private HitscanWeapon weapon;
         private float dashReadyAt;
         private float focusReadyAt;
@@ -31,6 +33,7 @@ namespace ProjectSun.FPS.Abilities
         public void Configure(FpsPlayerController controller, HitscanWeapon hitscanWeapon)
         {
             player = controller;
+            input = player != null ? player.Input : null;
             weapon = hitscanWeapon;
         }
 
@@ -38,9 +41,9 @@ namespace ProjectSun.FPS.Abilities
 
         private void Update()
         {
-            if (!gameplayInputEnabled) return;
-            if (Input.GetKeyDown(KeyCode.Q)) TryDash();
-            if (Input.GetKeyDown(KeyCode.E)) TryFocus();
+            if (!gameplayInputEnabled || input == null) return;
+            if (input.WasPressed(FpsBinding.Dash)) TryDash();
+            if (input.WasPressed(FpsBinding.Focus)) TryFocus();
         }
 
         private void TryDash()

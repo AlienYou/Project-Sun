@@ -1,5 +1,6 @@
 using System;
 using ProjectSun.FPS.Core;
+using ProjectSun.FPS.Input;
 using UnityEngine;
 
 namespace ProjectSun.FPS.Weapons
@@ -11,6 +12,7 @@ namespace ProjectSun.FPS.Weapons
         [SerializeField] private WeaponStats fallbackStats = WeaponStats.Carbine;
 
         private Camera viewCamera;
+        private FpsInput input;
         private Transform muzzle;
         private WeaponStats stats;
         private int ammoInMagazine;
@@ -33,6 +35,7 @@ namespace ProjectSun.FPS.Weapons
         public void Configure(Camera playerCamera, Transform muzzleTransform)
         {
             viewCamera = playerCamera;
+            input = GetComponent<FpsInput>();
             muzzle = muzzleTransform;
             RefreshLoadout();
         }
@@ -68,17 +71,18 @@ namespace ProjectSun.FPS.Weapons
         {
             stats = loadout.BuildStats(fallbackStats);
             ammoInMagazine = stats.magazineSize;
+            input = GetComponent<FpsInput>();
         }
 
         private void Update()
         {
-            if (viewCamera == null || !gameplayInputEnabled) return;
+            if (viewCamera == null || input == null || !gameplayInputEnabled || !input.GameplayEnabled) return;
 
-            IsAiming = Input.GetMouseButton(1) && !reloading;
-            if (Input.GetKeyDown(KeyCode.R) && ammoInMagazine < stats.magazineSize)
+            IsAiming = input.IsHeld(FpsBinding.Aim) && !reloading;
+            if (input.WasPressed(FpsBinding.Reload) && ammoInMagazine < stats.magazineSize)
                 StartReload();
 
-            if (Input.GetMouseButton(0) && Time.time >= nextFireTime)
+            if (input.IsHeld(FpsBinding.Fire) && Time.time >= nextFireTime)
                 Fire();
         }
 

@@ -68,7 +68,7 @@ namespace ProjectSun.FPS.Bootstrap
             camera.nearClipPlane = 0.03f;
             camera.fieldOfView = 78f;
             camera.clearFlags = CameraClearFlags.Skybox;
-            player.Configure(cameraObject.transform);
+            player.Configure(cameraObject.transform, camera);
 
             Transform muzzle = CreateWeaponVisual(cameraObject.transform);
             weapon = playerObject.AddComponent<HitscanWeapon>();
