@@ -13,17 +13,26 @@ namespace ProjectSun.FPS.UI
         private HitscanWeapon weapon;
         private FpsPlayerController player;
         private FpsAbilityController abilities;
+        private bool ownsRuntimeOptions;
         private bool isOpen;
         private GUIStyle titleStyle;
         private GUIStyle bodyStyle;
 
-        public void Configure(HitscanWeapon hitscanWeapon, FpsPlayerController controller, FpsAbilityController abilityController)
+        public void Configure(HitscanWeapon hitscanWeapon, FpsPlayerController controller, FpsAbilityController abilityController,
+            WeaponLoadoutCatalog catalog = null)
         {
             weapon = hitscanWeapon;
             player = controller;
             abilities = abilityController;
-            if (options.Count == 0)
+            if (catalog != null && catalog.Attachments.Count > 0)
+            {
+                ReplaceOptionsWithCatalog(catalog);
+            }
+            else if (options.Count == 0)
+            {
                 CreateOptions();
+                ownsRuntimeOptions = true;
+            }
         }
 
         private void Update()
@@ -34,6 +43,7 @@ namespace ProjectSun.FPS.UI
 
         private void OnDestroy()
         {
+            if (!ownsRuntimeOptions) return;
             foreach (WeaponAttachment option in options)
                 if (option != null) Destroy(option);
         }
@@ -46,7 +56,8 @@ namespace ProjectSun.FPS.UI
             float panelHeight = Mathf.Min(620f, Screen.height - 48f);
             Rect panel = new Rect((Screen.width - panelWidth) * 0.5f, (Screen.height - panelHeight) * 0.5f, panelWidth, panelHeight);
             GUI.Box(panel, GUIContent.none);
-            GUI.Label(new Rect(panel.x + 26f, panel.y + 20f, 600f, 34f), "AR-4 // FIELD LOADOUT", titleStyle);
+            string weaponName = weapon.Loadout.Weapon != null ? weapon.Loadout.Weapon.displayName : "AR-4 CARBINE";
+            GUI.Label(new Rect(panel.x + 26f, panel.y + 20f, 600f, 34f), $"{weaponName.ToUpperInvariant()} // FIELD LOADOUT", titleStyle);
             GUI.Label(new Rect(panel.x + 26f, panel.y + 55f, 660f, 24f), "Pick one component per slot. Changes apply immediately. Press TAB to resume.", bodyStyle);
 
             float columnWidth = (panel.width - 54f) * 0.5f;
@@ -116,6 +127,20 @@ namespace ProjectSun.FPS.UI
             Add(AttachmentSlot.Magazine, "FAST MAG", magazine: 0.80f, reload: 0.74f);
             Add(AttachmentSlot.Stock, "TACTICAL STOCK", hipSpread: 0.88f, aimSpread: 0.78f);
             Add(AttachmentSlot.Stock, "LIGHT STOCK", fireRate: 1.08f, hipSpread: 1.12f);
+        }
+
+        private void ReplaceOptionsWithCatalog(WeaponLoadoutCatalog catalog)
+        {
+            if (ownsRuntimeOptions)
+            {
+                foreach (WeaponAttachment option in options)
+                    if (option != null) Destroy(option);
+            }
+            options.Clear();
+            foreach (WeaponAttachment attachment in catalog.Attachments)
+                if (attachment != null)
+                    options.Add(attachment);
+            ownsRuntimeOptions = false;
         }
 
         private void Add(AttachmentSlot slot, string displayName, float damage = 1f, float fireRate = 1f, float magazine = 1f,

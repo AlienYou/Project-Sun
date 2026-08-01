@@ -1,4 +1,5 @@
 using ProjectSun.FPS.UI;
+using ProjectSun.FPS.Weapons;
 using UnityEngine;
 
 namespace ProjectSun.FPS.Bootstrap
@@ -10,22 +11,29 @@ namespace ProjectSun.FPS.Bootstrap
         [SerializeField] private FpsPlayerInstaller playerInstaller;
         [SerializeField] private FpsHud hud;
         [SerializeField] private WeaponCustomizationUI customization;
+        [SerializeField] private WeaponLoadoutCatalog loadoutCatalog;
 
-        public void SetReferences(FpsPlayerInstaller player, FpsHud playerHud, WeaponCustomizationUI loadoutUi)
+        public void SetReferences(FpsPlayerInstaller player, FpsHud playerHud, WeaponCustomizationUI loadoutUi,
+            WeaponLoadoutCatalog catalog = null)
         {
             playerInstaller = player;
             hud = playerHud;
             customization = loadoutUi;
+            loadoutCatalog = catalog;
         }
+
+        public void SetLoadoutCatalog(WeaponLoadoutCatalog catalog) => loadoutCatalog = catalog;
 
         private void Awake()
         {
             if (playerInstaller == null) return;
             playerInstaller.Initialize();
+            if (loadoutCatalog != null)
+                playerInstaller.Weapon.SetWeaponDefinition(loadoutCatalog.DefaultWeapon);
             if (hud != null)
                 hud.Configure(playerInstaller.Weapon, playerInstaller.Abilities, playerInstaller.Health);
             if (customization != null)
-                customization.Configure(playerInstaller.Weapon, playerInstaller.Player, playerInstaller.Abilities);
+                customization.Configure(playerInstaller.Weapon, playerInstaller.Player, playerInstaller.Abilities, loadoutCatalog);
         }
     }
 }

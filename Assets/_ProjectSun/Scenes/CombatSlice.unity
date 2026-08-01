@@ -245,6 +245,7 @@ MonoBehaviour:
   playerInstaller: {fileID: 1802632478}
   hud: {fileID: 92926358}
   customization: {fileID: 92926357}
+  loadoutCatalog: {fileID: 11400000, guid: a66fbff73b3c5c441925856b5b1209a1, type: 2}
 --- !u!114 &92926357
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -45,6 +45,13 @@ namespace ProjectSun.FPS.Weapons
                 ammoInMagazine = stats.magazineSize;
         }
 
+        public void SetWeaponDefinition(WeaponDefinition definition)
+        {
+            if (definition == null) return;
+            loadout.SetWeapon(definition);
+            RefreshLoadout();
+        }
+
         public void SetAbilityModifiers(float newDamageMultiplier, float newSpreadMultiplier)
         {
             damageMultiplier = Mathf.Max(0f, newDamageMultiplier);

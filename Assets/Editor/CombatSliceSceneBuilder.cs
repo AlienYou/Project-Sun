@@ -45,6 +45,7 @@ namespace ProjectSun.FPS.Editor
             Material wallMaterial = CreateOrGetMaterial(WallMaterialPath, new Color(0.11f, 0.16f, 0.21f));
             Material targetMaterial = CreateOrGetMaterial(TargetMaterialPath, new Color(0.11f, 0.60f, 0.82f));
             Material weaponMaterial = CreateOrGetMaterial(WeaponMaterialPath, new Color(0.09f, 0.12f, 0.15f));
+            WeaponLoadoutCatalog loadoutCatalog = CombatWeaponDataGenerator.CreateOrGetDataAssets();
             GameObject playerPrefab = CreateOrGetPlayerPrefab(weaponMaterial);
             GameObject targetPrefab = CreateOrGetTargetPrefab(targetMaterial);
 
@@ -54,7 +55,7 @@ namespace ProjectSun.FPS.Editor
             CreateEnvironment(sceneRoot.transform, floorMaterial, wallMaterial);
             FpsPlayerInstaller player = CreatePlayer(sceneRoot.transform, playerPrefab);
             CreateTargets(sceneRoot.transform, targetPrefab);
-            CreateSystems(sceneRoot.transform, player);
+            CreateSystems(sceneRoot.transform, player, loadoutCatalog);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -166,14 +167,14 @@ namespace ProjectSun.FPS.Editor
             return playerObject.GetComponent<FpsPlayerInstaller>();
         }
 
-        private static void CreateSystems(Transform parent, FpsPlayerInstaller player)
+        private static void CreateSystems(Transform parent, FpsPlayerInstaller player, WeaponLoadoutCatalog loadoutCatalog)
         {
             GameObject systems = new GameObject("Game Systems");
             systems.transform.SetParent(parent);
             FpsHud hud = systems.AddComponent<FpsHud>();
             WeaponCustomizationUI customization = systems.AddComponent<WeaponCustomizationUI>();
             CombatSliceSceneInstaller installer = systems.AddComponent<CombatSliceSceneInstaller>();
-            installer.SetReferences(player, hud, customization);
+            installer.SetReferences(player, hud, customization, loadoutCatalog);
         }
 
         private static void CreateLighting(Transform parent)

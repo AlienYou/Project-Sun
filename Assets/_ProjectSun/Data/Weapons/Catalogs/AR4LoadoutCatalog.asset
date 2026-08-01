@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8cd6d36d4eecf224bb13284104cec479, type: 3}
+  m_Name: AR4LoadoutCatalog
+  m_EditorClassIdentifier: 
+  defaultWeapon: {fileID: 11400000, guid: 67abb993db0b8044b941d74fe5a3749b, type: 2}
+  attachments:
+  - {fileID: 11400000, guid: 0bf13dd4beafcd048bbbf07c828e9020, type: 2}
+  - {fileID: 11400000, guid: 8f13106fba53e444a9ecac7d7e45ea9c, type: 2}
+  - {fileID: 11400000, guid: 597a0d1850461a1449d92ea8a03749ab, type: 2}
+  - {fileID: 11400000, guid: ddfe08e4567dfc74789a7c1e729bccd9, type: 2}
+  - {fileID: 11400000, guid: 160fea944be5f6b46b79aa16b8bbc394, type: 2}
+  - {fileID: 11400000, guid: c7504b77440ad06489da6013e43c014f, type: 2}
+  - {fileID: 11400000, guid: 8a767d15368ff834c9b0840e82c3ed4e, type: 2}
+  - {fileID: 11400000, guid: 911ee5b32a23c8e4cbf3939ad6410949, type: 2}
+  - {fileID: 11400000, guid: fac21fa904050ca4d9b45bb835746894, type: 2}
+  - {fileID: 11400000, guid: f3f104be0ba587c4fa3cae504b24e2e7, type: 2}
