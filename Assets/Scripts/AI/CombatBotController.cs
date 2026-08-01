@@ -2,6 +2,7 @@ using System.Collections;
 using ProjectSun.FPS.Core;
 using ProjectSun.FPS.Player;
 using ProjectSun.FPS.Rounds;
+using ProjectSun.FPS.UI;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -72,7 +73,7 @@ namespace ProjectSun.FPS.AI
 
             Vector3 toPlayer = player.position - transform.position;
             float distance = toPlayer.magnitude;
-            bool canSeePlayer = distance <= detectionRange && HasLineOfSight(distance);
+            bool canSeePlayer = distance <= detectionRange && HasLineOfSight();
             if (!canSeePlayer)
             {
                 if (wasEngaging)
@@ -122,13 +123,20 @@ namespace ProjectSun.FPS.AI
             nextPatrolAt = Time.time + patrolInterval;
         }
 
-        private bool HasLineOfSight(float distance)
+        private bool HasLineOfSight() => TryGetPlayerHit(out _);
+
+        private bool TryGetPlayerHit(out RaycastHit hit)
         {
             Vector3 origin = transform.position + Vector3.up * 1.35f;
             Vector3 target = player.position + Vector3.up * 1.35f;
-            Vector3 direction = (target - origin).normalized;
-            if (!Physics.Raycast(origin, direction, out RaycastHit hit, distance, ~0, QueryTriggerInteraction.Ignore)) return false;
-            return hit.collider.GetComponentInParent<FpsPlayerController>() != null;
+            Vector3 offset = target - origin;
+            float rayDistance = offset.magnitude;
+            Ray ray = new Ray(origin, offset.normalized);
+            bool hasHit = Physics.Raycast(ray, out hit, rayDistance, CombatLayers.BallisticMask, QueryTriggerInteraction.Ignore);
+            bool hitPlayer = hasHit && hit.collider.GetComponentInParent<FpsPlayerController>() != null;
+            CombatRayDebugOverlay.Record($"DEFENDER {name}", ray, hasHit, hit,
+                hitPlayer ? CombatRayOutcome.Visible : hasHit ? CombatRayOutcome.Blocked : CombatRayOutcome.Miss);
+            return hitPlayer;
         }
 
         private void Face(Vector3 point)
@@ -141,11 +149,13 @@ namespace ProjectSun.FPS.AI
         private void TryShootPlayer()
         {
             if (Time.time < nextShotAt) return;
-            nextShotAt = Time.time + 1f / shotsPerSecond;
+            if (!TryGetPlayerHit(out RaycastHit hit)) return;
             Health playerHealth = player.GetComponent<Health>();
             if (playerHealth == null || !playerHealth.IsAlive) return;
+            nextShotAt = Time.time + 1f / shotsPerSecond;
             Vector3 direction = (player.position - transform.position).normalized;
-            playerHealth.ApplyDamage(new DamageInfo(shotDamage, player.position, direction, gameObject));
+            playerHealth.ApplyDamage(new DamageInfo(shotDamage, hit.point, direction, gameObject));
+            CombatRayDebugOverlay.MarkDamageApplied($"DEFENDER {name}");
         }
 
         private void OnDied()

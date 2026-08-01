@@ -1,6 +1,7 @@
 using System;
 using ProjectSun.FPS.Core;
 using ProjectSun.FPS.Input;
+using ProjectSun.FPS.UI;
 using UnityEngine;
 
 namespace ProjectSun.FPS.Weapons
@@ -115,12 +116,16 @@ namespace ProjectSun.FPS.Weapons
 
             Ray ray = new Ray(viewCamera.transform.position, direction);
             Vector3 endPoint = ray.GetPoint(stats.range);
-            if (Physics.Raycast(ray, out RaycastHit hit, stats.range, ~0, QueryTriggerInteraction.Ignore))
+            if (Physics.Raycast(ray, out RaycastHit hit, stats.range, CombatLayers.BallisticMask, QueryTriggerInteraction.Ignore))
             {
                 endPoint = hit.point;
                 WeaponImpactEffect.Spawn(hit.point, hit.normal);
-                if (DealDamage(hit, direction)) HitConfirmed?.Invoke(hit);
+                bool dealtDamage = DealDamage(hit, direction);
+                CombatRayDebugOverlay.Record("PLAYER", ray, true, hit,
+                    dealtDamage ? CombatRayOutcome.DamageApplied : CombatRayOutcome.Blocked);
+                if (dealtDamage) HitConfirmed?.Invoke(hit);
             }
+            else CombatRayDebugOverlay.Record("PLAYER", ray, false, default, CombatRayOutcome.Miss);
             ShotTracer.Spawn(muzzle != null ? muzzle.position : ray.origin, endPoint);
         }
 
@@ -129,6 +134,7 @@ namespace ProjectSun.FPS.Weapons
             MonoBehaviour[] components = hit.collider.GetComponentsInParent<MonoBehaviour>();
             foreach (MonoBehaviour component in components)
             {
+                if (component.gameObject == gameObject) continue;
                 if (component is IDamageable damageable)
                 {
                     damageable.ApplyDamage(new DamageInfo(stats.damage * damageMultiplier, hit.point, direction, gameObject));
@@ -203,10 +209,15 @@ namespace ProjectSun.FPS.Weapons
         {
             GameObject impact = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             impact.name = "Weapon Impact";
+            impact.layer = CombatLayers.IgnoreRaycastLayer;
             impact.transform.position = point + normal * 0.012f;
             impact.transform.localScale = Vector3.one * 0.075f;
             Collider collider = impact.GetComponent<Collider>();
-            if (collider != null) Destroy(collider);
+            if (collider != null)
+            {
+                collider.enabled = false;
+                Destroy(collider);
+            }
             Renderer renderer = impact.GetComponent<Renderer>();
             if (sharedMaterial == null)
             {

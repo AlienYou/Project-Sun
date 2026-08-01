@@ -1,4 +1,5 @@
 using ProjectSun.FPS.UI;
+using ProjectSun.FPS.Core;
 using ProjectSun.FPS.Weapons;
 using ProjectSun.FPS.Rounds;
 using UnityEngine;
@@ -28,6 +29,7 @@ namespace ProjectSun.FPS.Bootstrap
         private void Awake()
         {
             if (playerInstaller == null) return;
+            CombatLayers.ApplyCombatSliceLayers(transform.parent);
             playerInstaller.Initialize();
             if (loadoutCatalog != null)
                 playerInstaller.Weapon.SetWeaponDefinition(loadoutCatalog.DefaultWeapon);
@@ -39,6 +41,9 @@ namespace ProjectSun.FPS.Bootstrap
             FpsSettingsMenu settings = GetComponent<FpsSettingsMenu>();
             if (settings == null) settings = gameObject.AddComponent<FpsSettingsMenu>();
             settings.Configure(playerInstaller.Player, playerInstaller.Weapon, playerInstaller.Abilities);
+            CombatRayDebugOverlay debugOverlay = GetComponent<CombatRayDebugOverlay>();
+            if (debugOverlay == null) debugOverlay = gameObject.AddComponent<CombatRayDebugOverlay>();
+            debugOverlay.Configure(playerInstaller.Player);
         }
     }
 }

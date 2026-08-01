@@ -181,6 +181,7 @@ namespace ProjectSun.FPS.Editor
             FpsHud hud = systems.AddComponent<FpsHud>();
             WeaponCustomizationUI customization = systems.AddComponent<WeaponCustomizationUI>();
             systems.AddComponent<FpsSettingsMenu>();
+            systems.AddComponent<CombatRayDebugOverlay>();
             RoundManager roundManager = systems.AddComponent<RoundManager>();
             roundManager.SetObjectives(objectives);
             CombatSliceSceneInstaller installer = systems.AddComponent<CombatSliceSceneInstaller>();
@@ -237,6 +238,7 @@ namespace ProjectSun.FPS.Editor
         {
             GameObject block = GameObject.CreatePrimitive(PrimitiveType.Cube);
             block.name = name;
+            block.layer = CombatLayers.WallLayer;
             block.transform.SetParent(parent);
             block.transform.position = position;
             block.transform.localScale = scale;

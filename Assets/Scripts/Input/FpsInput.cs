@@ -22,7 +22,8 @@ namespace ProjectSun.FPS.Input
         Interact,
         Loadout,
         Settings,
-        Menu
+        Menu,
+        DebugCombat
     }
 
     /// <summary>
@@ -58,6 +59,7 @@ namespace ProjectSun.FPS.Input
         private InputAction loadout;
         private InputAction settings;
         private InputAction menu;
+        private InputAction debugCombat;
         private InputActionRebindingExtensions.RebindingOperation rebindingOperation;
 
         public float LookSensitivity => lookSensitivity;
@@ -177,6 +179,7 @@ namespace ProjectSun.FPS.Input
             loadout = gameplayMap.AddAction("Loadout", InputActionType.Button, "<Keyboard>/tab");
             settings = gameplayMap.AddAction("Settings", InputActionType.Button, "<Keyboard>/o");
             menu = gameplayMap.AddAction("Menu", InputActionType.Button, "<Keyboard>/escape");
+            debugCombat = gameplayMap.AddAction("DebugCombat", InputActionType.Button, "<Keyboard>/f10");
         }
 
         private void LoadPersistedSettings()
@@ -220,6 +223,7 @@ namespace ProjectSun.FPS.Input
                 case FpsBinding.Loadout: return loadout;
                 case FpsBinding.Settings: return settings;
                 case FpsBinding.Menu: return menu;
+                case FpsBinding.DebugCombat: return debugCombat;
                 default: return null;
             }
         }

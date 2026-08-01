@@ -109,6 +109,7 @@ namespace ProjectSun.FPS.Editor
             EnsureFolder("Assets/_ProjectSun/Art/Materials");
 
             GameObject root = new GameObject("Training Defender");
+            root.layer = CombatLayers.CharacterLayer;
             root.AddComponent<Health>();
             NavMeshAgent agent = root.AddComponent<NavMeshAgent>();
             agent.radius = 0.32f;
@@ -121,6 +122,7 @@ namespace ProjectSun.FPS.Editor
 
             GameObject visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             visual.name = "Visual";
+            visual.layer = CombatLayers.CharacterLayer;
             visual.transform.SetParent(root.transform, false);
             visual.transform.localPosition = Vector3.up;
             visual.transform.localScale = new Vector3(0.7f, 1f, 0.7f);

@@ -14,6 +14,9 @@ namespace ProjectSun.FPS.UI
         private Health health;
         private RoundManager roundManager;
         private float hitMarkerUntil;
+        private float damageWarningUntil;
+        private string damageDirection = string.Empty;
+        private string damageSource = string.Empty;
         private GUIStyle textStyle;
         private GUIStyle largeTextStyle;
 
@@ -21,16 +24,19 @@ namespace ProjectSun.FPS.UI
             RoundManager combatRoundManager = null)
         {
             if (weapon != null) weapon.HitConfirmed -= ShowHitMarker;
+            if (health != null) health.Damaged -= ShowDamageWarning;
             weapon = hitscanWeapon;
             abilities = abilityController;
             health = playerHealth;
             roundManager = combatRoundManager;
             if (weapon != null) weapon.HitConfirmed += ShowHitMarker;
+            if (health != null) health.Damaged += ShowDamageWarning;
         }
 
         private void OnDestroy()
         {
             if (weapon != null) weapon.HitConfirmed -= ShowHitMarker;
+            if (health != null) health.Damaged -= ShowDamageWarning;
         }
 
         private void OnGUI()
@@ -59,9 +65,27 @@ namespace ProjectSun.FPS.UI
             DrawCrosshair(width, height);
             if (Time.time < hitMarkerUntil)
                 GUI.Label(new Rect(width * 0.5f - 15f, height * 0.5f - 20f, 30f, 36f), "X", largeTextStyle);
+            if (Time.time < damageWarningUntil)
+                GUI.Label(new Rect(width * 0.5f - 180f, height * 0.5f + 64f, 360f, 28f),
+                    $"UNDER FIRE  {damageDirection}  //  {damageSource}", largeTextStyle);
         }
 
         private void ShowHitMarker(RaycastHit hit) => hitMarkerUntil = Time.time + 0.12f;
+
+        private void ShowDamageWarning(DamageInfo damage)
+        {
+            damageWarningUntil = Time.time + 0.6f;
+            if (damage.Instigator == null || health == null)
+            {
+                damageDirection = "UNKNOWN";
+                damageSource = "UNKNOWN";
+                return;
+            }
+            damageSource = damage.Instigator.name.ToUpperInvariant();
+            Vector3 local = health.transform.InverseTransformDirection(damage.Instigator.transform.position - health.transform.position);
+            if (Mathf.Abs(local.x) > Mathf.Abs(local.z)) damageDirection = local.x > 0f ? "RIGHT" : "LEFT";
+            else damageDirection = local.z > 0f ? "FRONT" : "REAR";
+        }
 
         private void DrawCrosshair(float width, float height)
         {
