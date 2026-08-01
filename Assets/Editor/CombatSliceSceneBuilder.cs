@@ -2,6 +2,7 @@ using ProjectSun.FPS.Abilities;
 using ProjectSun.FPS.Bootstrap;
 using ProjectSun.FPS.Core;
 using ProjectSun.FPS.Player;
+using ProjectSun.FPS.Rounds;
 using ProjectSun.FPS.UI;
 using ProjectSun.FPS.Weapons;
 using ProjectSun.FPS.World;
@@ -53,9 +54,10 @@ namespace ProjectSun.FPS.Editor
             GameObject sceneRoot = new GameObject("Combat Slice");
             CreateLighting(sceneRoot.transform);
             CreateEnvironment(sceneRoot.transform, floorMaterial, wallMaterial);
+            ObjectiveZone[] objectives = CombatSliceRoundSetup.CreateObjectives(sceneRoot.transform);
             FpsPlayerInstaller player = CreatePlayer(sceneRoot.transform, playerPrefab);
             CreateTargets(sceneRoot.transform, targetPrefab);
-            CreateSystems(sceneRoot.transform, player, loadoutCatalog);
+            CreateSystems(sceneRoot.transform, player, loadoutCatalog, objectives);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -167,12 +169,15 @@ namespace ProjectSun.FPS.Editor
             return playerObject.GetComponent<FpsPlayerInstaller>();
         }
 
-        private static void CreateSystems(Transform parent, FpsPlayerInstaller player, WeaponLoadoutCatalog loadoutCatalog)
+        private static void CreateSystems(Transform parent, FpsPlayerInstaller player, WeaponLoadoutCatalog loadoutCatalog,
+            ObjectiveZone[] objectives)
         {
             GameObject systems = new GameObject("Game Systems");
             systems.transform.SetParent(parent);
             FpsHud hud = systems.AddComponent<FpsHud>();
             WeaponCustomizationUI customization = systems.AddComponent<WeaponCustomizationUI>();
+            RoundManager roundManager = systems.AddComponent<RoundManager>();
+            roundManager.SetObjectives(objectives);
             CombatSliceSceneInstaller installer = systems.AddComponent<CombatSliceSceneInstaller>();
             installer.SetReferences(player, hud, customization, loadoutCatalog);
         }

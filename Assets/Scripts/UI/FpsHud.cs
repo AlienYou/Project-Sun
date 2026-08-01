@@ -1,5 +1,6 @@
 using ProjectSun.FPS.Abilities;
 using ProjectSun.FPS.Core;
+using ProjectSun.FPS.Rounds;
 using ProjectSun.FPS.Weapons;
 using UnityEngine;
 
@@ -11,14 +12,17 @@ namespace ProjectSun.FPS.UI
         private HitscanWeapon weapon;
         private FpsAbilityController abilities;
         private Health health;
+        private RoundManager roundManager;
         private GUIStyle textStyle;
         private GUIStyle largeTextStyle;
 
-        public void Configure(HitscanWeapon hitscanWeapon, FpsAbilityController abilityController, Health playerHealth)
+        public void Configure(HitscanWeapon hitscanWeapon, FpsAbilityController abilityController, Health playerHealth,
+            RoundManager combatRoundManager = null)
         {
             weapon = hitscanWeapon;
             abilities = abilityController;
             health = playerHealth;
+            roundManager = combatRoundManager;
         }
 
         private void OnGUI()
@@ -34,9 +38,15 @@ namespace ProjectSun.FPS.UI
             GUI.Label(new Rect(width - 210, height - 82, 180, 26), reload, textStyle);
 
             GUI.Label(new Rect(28, 24, 510, 25), "PROJECT SUN // COMBAT TRAINING RANGE", textStyle);
+            if (roundManager != null)
+            {
+                GUI.Label(new Rect(width - 250f, 24, 220f, 25),
+                    $"{roundManager.StateLabel}  {Mathf.CeilToInt(roundManager.TimeRemaining):000}s", textStyle);
+                GUI.Label(new Rect(28, 102, 640f, 24), roundManager.ObjectiveText, textStyle);
+            }
             GUI.Label(new Rect(28, 50, 550, 24),
                 $"[Q] DASH {Cooldown(abilities.DashCooldownRemaining)}    [E] FOCUS {Cooldown(abilities.FocusCooldownRemaining, abilities.IsFocused)}", textStyle);
-            GUI.Label(new Rect(28, 76, 640, 24), "WASD move  SHIFT sprint  SPACE jump  C crouch  RMB aim  R reload  TAB loadout", textStyle);
+            GUI.Label(new Rect(28, 76, 680, 24), "WASD move  SHIFT sprint  SPACE jump  C crouch  RMB aim  R reload  F interact  TAB loadout", textStyle);
 
             GUI.Label(new Rect(width * 0.5f - 10, height * 0.5f - 13, 20, 26), "+", largeTextStyle);
         }

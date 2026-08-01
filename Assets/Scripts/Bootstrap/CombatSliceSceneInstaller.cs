@@ -1,5 +1,6 @@
 using ProjectSun.FPS.UI;
 using ProjectSun.FPS.Weapons;
+using ProjectSun.FPS.Rounds;
 using UnityEngine;
 
 namespace ProjectSun.FPS.Bootstrap
@@ -30,8 +31,9 @@ namespace ProjectSun.FPS.Bootstrap
             playerInstaller.Initialize();
             if (loadoutCatalog != null)
                 playerInstaller.Weapon.SetWeaponDefinition(loadoutCatalog.DefaultWeapon);
+            RoundManager roundManager = FindObjectOfType<RoundManager>();
             if (hud != null)
-                hud.Configure(playerInstaller.Weapon, playerInstaller.Abilities, playerInstaller.Health);
+                hud.Configure(playerInstaller.Weapon, playerInstaller.Abilities, playerInstaller.Health, roundManager);
             if (customization != null)
                 customization.Configure(playerInstaller.Weapon, playerInstaller.Player, playerInstaller.Abilities, loadoutCatalog);
         }
