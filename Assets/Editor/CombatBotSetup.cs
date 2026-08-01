@@ -72,6 +72,7 @@ namespace ProjectSun.FPS.Editor
                 defendersObject.transform.SetParent(combatSliceRoot);
                 defenders = defendersObject.transform;
             }
+            CombatCoverPoint[] coverPoints = combatSliceRoot.GetComponentsInChildren<CombatCoverPoint>(true);
 
             CombatBotController[] existingBots = defenders.GetComponentsInChildren<CombatBotController>(true);
             if (existingBots.Length > 0)
@@ -79,6 +80,7 @@ namespace ProjectSun.FPS.Editor
                 foreach (CombatBotController bot in existingBots)
                 {
                     bot.Configure(player, objectives, bot.transform.position);
+                    bot.SetCoverPoints(coverPoints);
                     EditorUtility.SetDirty(bot);
                 }
                 return;
@@ -97,6 +99,7 @@ namespace ProjectSun.FPS.Editor
                 botObject.transform.position = positions[i];
                 CombatBotController bot = botObject.GetComponent<CombatBotController>();
                 bot.Configure(player, objectives, positions[i]);
+                bot.SetCoverPoints(coverPoints);
                 EditorUtility.SetDirty(bot);
             }
         }

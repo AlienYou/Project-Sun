@@ -35,6 +35,9 @@ namespace ProjectSun.FPS.Bootstrap
             if (loadoutCatalog != null)
                 playerInstaller.Weapon.SetWeaponDefinition(loadoutCatalog.DefaultWeapon);
             RoundManager roundManager = FindObjectOfType<RoundManager>();
+            CombatCoverPoint[] coverPoints = FindObjectsOfType<CombatCoverPoint>();
+            foreach (CombatBotController defender in FindObjectsOfType<CombatBotController>())
+                defender.SetCoverPoints(coverPoints);
             if (roundManager != null)
                 roundManager.ConfigureCombatants(playerInstaller, FindObjectsOfType<CombatBotController>());
             if (hud != null)

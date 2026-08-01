@@ -25,6 +25,9 @@ namespace ProjectSun.FPS.AI
         [SerializeField] private Transform player;
         [SerializeField] private ObjectiveZone[] defendedObjectives = System.Array.Empty<ObjectiveZone>();
         [SerializeField] private Vector3 guardPosition;
+        [SerializeField] private CombatCoverPoint[] coverPoints = System.Array.Empty<CombatCoverPoint>();
+        [SerializeField, Min(0.5f)] private float coverSearchRadius = 18f;
+        [SerializeField, Min(0.1f)] private float coverArrivalDistance = 0.55f;
 
         private NavMeshAgent agent;
         private Health health;
@@ -39,9 +42,11 @@ namespace ProjectSun.FPS.AI
         private string debugState = "STANDBY";
         private string latestRayResult = "NO QUERY";
         private float targetDistance;
+        private CombatCoverPoint currentCover;
+        private bool movingToPeek;
 
         public bool IsAlive => health != null && health.IsAlive;
-        public string DebugState => debugState;
+        public string DebugState => currentCover != null ? $"{debugState} [{currentCover.name}]" : debugState;
         public string LatestRayResult => latestRayResult;
         public float TargetDistance => targetDistance;
 
@@ -52,12 +57,17 @@ namespace ProjectSun.FPS.AI
             guardPosition = guardPoint;
         }
 
+        public void SetCoverPoints(CombatCoverPoint[] points) => coverPoints = points ?? System.Array.Empty<CombatCoverPoint>();
+
         public void SetCombatEnabled(bool enabled)
         {
             combatEnabled = enabled;
-            if (!enabled && agent != null && agent.enabled)
-                agent.isStopped = true;
-            if (!enabled && IsAlive) debugState = "STANDBY";
+            if (!enabled)
+            {
+                if (agent != null && agent.enabled) agent.isStopped = true;
+                ReleaseCover();
+                if (IsAlive) debugState = "STANDBY";
+            }
             if (enabled && IsAlive)
                 Patrol();
         }
@@ -71,6 +81,7 @@ namespace ProjectSun.FPS.AI
             wasEngaging = false;
             nextPatrolAt = 0f;
             debugState = "STANDBY";
+            ReleaseCover();
             if (agent != null && agent.enabled) agent.enabled = false;
             if (NavMesh.SamplePosition(guardPosition, out NavMeshHit hit, 8f, NavMesh.AllAreas))
                 transform.position = hit.position;
@@ -105,6 +116,7 @@ namespace ProjectSun.FPS.AI
         private void OnDestroy()
         {
             if (health != null) health.Died -= OnDied;
+            ReleaseCover();
         }
 
         private void Update()
@@ -117,6 +129,7 @@ namespace ProjectSun.FPS.AI
             bool canSeePlayer = distance <= detectionRange && HasLineOfSight();
             if (!canSeePlayer)
             {
+                if (MoveThroughCover()) return;
                 debugState = "PATROL";
                 if (wasEngaging)
                 {
@@ -129,8 +142,16 @@ namespace ProjectSun.FPS.AI
 
             wasEngaging = true;
             Face(player.position);
+            if (currentCover != null && !movingToPeek)
+            {
+                movingToPeek = true;
+                SetDestination(currentCover.PeekPosition);
+                debugState = "PEEK";
+                return;
+            }
             if (distance > preferredRange)
             {
+                ReleaseCover();
                 debugState = "CHASE";
                 agent.isStopped = false;
                 agent.SetDestination(player.position);
@@ -165,6 +186,67 @@ namespace ProjectSun.FPS.AI
             agent.isStopped = false;
             agent.SetDestination(guardPosition);
             nextPatrolAt = Time.time + patrolInterval;
+        }
+
+        private bool MoveThroughCover()
+        {
+            if (currentCover == null && !ClaimBestCover()) return false;
+            if (currentCover == null) return false;
+
+            Vector3 destination = movingToPeek ? currentCover.PeekPosition : currentCover.CoverPosition;
+            if (Vector3.Distance(transform.position, destination) > coverArrivalDistance)
+            {
+                SetDestination(destination);
+                debugState = movingToPeek ? "PEEK" : "TAKE COVER";
+                return true;
+            }
+            if (!movingToPeek)
+            {
+                movingToPeek = true;
+                SetDestination(currentCover.PeekPosition);
+                debugState = "PEEK";
+                return true;
+            }
+
+            ReleaseCover();
+            return false;
+        }
+
+        private bool ClaimBestCover()
+        {
+            CombatCoverPoint best = null;
+            float bestDistance = float.MaxValue;
+            foreach (CombatCoverPoint point in coverPoints)
+            {
+                if (point == null || point.IsOccupied) continue;
+                if (!NavMesh.SamplePosition(point.CoverPosition, out NavMeshHit navHit, 1.5f, NavMesh.AllAreas)) continue;
+                float distance = Vector3.SqrMagnitude(navHit.position - transform.position);
+                if (distance > coverSearchRadius * coverSearchRadius || distance >= bestDistance) continue;
+                if (best != null) best.Release(this);
+                best = point;
+                bestDistance = distance;
+            }
+            if (best == null) return false;
+            if (!best.TryClaim(this)) return false;
+            currentCover = best;
+            movingToPeek = false;
+            return true;
+        }
+
+        private void ReleaseCover()
+        {
+            if (currentCover != null) currentCover.Release(this);
+            currentCover = null;
+            movingToPeek = false;
+        }
+
+        private void SetDestination(Vector3 destination)
+        {
+            if (agent == null || !agent.enabled || !agent.isOnNavMesh) return;
+            if (NavMesh.SamplePosition(destination, out NavMeshHit hit, 1.5f, NavMesh.AllAreas))
+                destination = hit.position;
+            agent.isStopped = false;
+            agent.SetDestination(destination);
         }
 
         private bool HasLineOfSight() => TryGetPlayerHit(out _);
@@ -211,6 +293,7 @@ namespace ProjectSun.FPS.AI
         {
             if (isRespawning) return;
             debugState = "ELIMINATED";
+            ReleaseCover();
             if (roundRespawnsEnabled) StartCoroutine(RespawnRoutine());
             else DisableAfterElimination();
         }
@@ -226,6 +309,7 @@ namespace ProjectSun.FPS.AI
         {
             isRespawning = true;
             debugState = "RESPAWNING";
+            ReleaseCover();
             if (agent != null) agent.enabled = false;
             foreach (Collider currentCollider in colliders) currentCollider.enabled = false;
             foreach (Renderer currentRenderer in renderers) currentRenderer.enabled = false;

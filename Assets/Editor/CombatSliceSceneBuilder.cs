@@ -59,6 +59,7 @@ namespace ProjectSun.FPS.Editor
             FpsPlayerInstaller player = CreatePlayer(sceneRoot.transform, playerPrefab);
             CreateTargets(sceneRoot.transform, targetPrefab);
             CreateSystems(sceneRoot.transform, player, loadoutCatalog, objectives);
+            CombatCoverSetup.CreateCoverPoints(sceneRoot.transform);
             CombatBotSetup.CreateCombatBots(sceneRoot.transform);
 
             EditorSceneManager.MarkSceneDirty(scene);
