@@ -118,13 +118,13 @@ namespace ProjectSun.FPS.Weapons
             if (Physics.Raycast(ray, out RaycastHit hit, stats.range, ~0, QueryTriggerInteraction.Ignore))
             {
                 endPoint = hit.point;
-                DealDamage(hit, direction);
-                HitConfirmed?.Invoke(hit);
+                WeaponImpactEffect.Spawn(hit.point, hit.normal);
+                if (DealDamage(hit, direction)) HitConfirmed?.Invoke(hit);
             }
             ShotTracer.Spawn(muzzle != null ? muzzle.position : ray.origin, endPoint);
         }
 
-        private void DealDamage(RaycastHit hit, Vector3 direction)
+        private bool DealDamage(RaycastHit hit, Vector3 direction)
         {
             MonoBehaviour[] components = hit.collider.GetComponentsInParent<MonoBehaviour>();
             foreach (MonoBehaviour component in components)
@@ -132,9 +132,10 @@ namespace ProjectSun.FPS.Weapons
                 if (component is IDamageable damageable)
                 {
                     damageable.ApplyDamage(new DamageInfo(stats.damage * damageMultiplier, hit.point, direction, gameObject));
-                    return;
+                    return true;
                 }
             }
+            return false;
         }
 
         private void StartReload()
@@ -163,13 +164,16 @@ namespace ProjectSun.FPS.Weapons
     internal sealed class ShotTracer : MonoBehaviour
     {
         private const float Lifetime = 0.045f;
+        private static Material sharedMaterial;
         private float remaining;
 
         public static void Spawn(Vector3 start, Vector3 end)
         {
             GameObject lineObject = new GameObject("Shot Tracer");
             LineRenderer line = lineObject.AddComponent<LineRenderer>();
-            line.material = new Material(Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default"));
+            if (sharedMaterial == null)
+                sharedMaterial = new Material(Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default"));
+            line.sharedMaterial = sharedMaterial;
             line.startColor = new Color(1f, 0.78f, 0.25f, 0.9f);
             line.endColor = new Color(1f, 0.78f, 0.25f, 0f);
             line.startWidth = 0.025f;
@@ -184,6 +188,39 @@ namespace ProjectSun.FPS.Weapons
         private void Update()
         {
             remaining -= Time.deltaTime;
+            if (remaining <= 0f) Destroy(gameObject);
+        }
+    }
+
+    /// <summary>Short-lived, dependency-free impact marker for prototype weapon validation.</summary>
+    internal sealed class WeaponImpactEffect : MonoBehaviour
+    {
+        private const float Lifetime = 0.16f;
+        private static Material sharedMaterial;
+        private float remaining;
+
+        public static void Spawn(Vector3 point, Vector3 normal)
+        {
+            GameObject impact = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            impact.name = "Weapon Impact";
+            impact.transform.position = point + normal * 0.012f;
+            impact.transform.localScale = Vector3.one * 0.075f;
+            Collider collider = impact.GetComponent<Collider>();
+            if (collider != null) Destroy(collider);
+            Renderer renderer = impact.GetComponent<Renderer>();
+            if (sharedMaterial == null)
+            {
+                sharedMaterial = new Material(Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default"));
+                sharedMaterial.color = new Color(1f, 0.62f, 0.18f, 0.9f);
+            }
+            renderer.sharedMaterial = sharedMaterial;
+            impact.AddComponent<WeaponImpactEffect>().remaining = Lifetime;
+        }
+
+        private void Update()
+        {
+            remaining -= Time.deltaTime;
+            transform.localScale *= 0.9f;
             if (remaining <= 0f) Destroy(gameObject);
         }
     }

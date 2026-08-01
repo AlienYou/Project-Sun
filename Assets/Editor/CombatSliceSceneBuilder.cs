@@ -117,6 +117,7 @@ namespace ProjectSun.FPS.Editor
             FpsPlayerController player = root.AddComponent<FpsPlayerController>();
             HitscanWeapon weapon = root.AddComponent<HitscanWeapon>();
             FpsAbilityController abilities = root.AddComponent<FpsAbilityController>();
+            root.AddComponent<WeaponFeedbackController>();
 
             GameObject cameraObject = new GameObject("Player Camera", typeof(Camera), typeof(AudioListener));
             cameraObject.transform.SetParent(root.transform, false);

@@ -45,6 +45,13 @@ namespace ProjectSun.FPS.Player
             speedMultiplier = Mathf.Max(0.1f, multiplier);
         }
 
+        /// <summary>Applies presentation-only weapon recoil while keeping pitch inside the configured view limits.</summary>
+        public void AddViewKick(float verticalDegrees, float horizontalDegrees)
+        {
+            pitch = Mathf.Clamp(pitch - verticalDegrees, -verticalLookLimit, verticalLookLimit);
+            transform.Rotate(Vector3.up * horizontalDegrees);
+        }
+
         public void SetGameplayInputEnabled(bool enabled)
         {
             gameplayInputEnabled = enabled;

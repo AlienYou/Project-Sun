@@ -13,16 +13,24 @@ namespace ProjectSun.FPS.UI
         private FpsAbilityController abilities;
         private Health health;
         private RoundManager roundManager;
+        private float hitMarkerUntil;
         private GUIStyle textStyle;
         private GUIStyle largeTextStyle;
 
         public void Configure(HitscanWeapon hitscanWeapon, FpsAbilityController abilityController, Health playerHealth,
             RoundManager combatRoundManager = null)
         {
+            if (weapon != null) weapon.HitConfirmed -= ShowHitMarker;
             weapon = hitscanWeapon;
             abilities = abilityController;
             health = playerHealth;
             roundManager = combatRoundManager;
+            if (weapon != null) weapon.HitConfirmed += ShowHitMarker;
+        }
+
+        private void OnDestroy()
+        {
+            if (weapon != null) weapon.HitConfirmed -= ShowHitMarker;
         }
 
         private void OnGUI()
@@ -48,7 +56,26 @@ namespace ProjectSun.FPS.UI
                 $"[Q] DASH {Cooldown(abilities.DashCooldownRemaining)}    [E] FOCUS {Cooldown(abilities.FocusCooldownRemaining, abilities.IsFocused)}", textStyle);
             GUI.Label(new Rect(28, 76, 760, 24), "WASD move  SHIFT sprint  SPACE jump  C crouch  RMB aim  R reload  F interact  TAB loadout  O settings", textStyle);
 
-            GUI.Label(new Rect(width * 0.5f - 10, height * 0.5f - 13, 20, 26), "+", largeTextStyle);
+            DrawCrosshair(width, height);
+            if (Time.time < hitMarkerUntil)
+                GUI.Label(new Rect(width * 0.5f - 15f, height * 0.5f - 20f, 30f, 36f), "X", largeTextStyle);
+        }
+
+        private void ShowHitMarker(RaycastHit hit) => hitMarkerUntil = Time.time + 0.12f;
+
+        private void DrawCrosshair(float width, float height)
+        {
+            float gap = weapon.IsAiming ? 4f : 8f;
+            const float length = 6f;
+            const float thickness = 2f;
+            Texture2D texture = Texture2D.whiteTexture;
+            Color oldColor = GUI.color;
+            GUI.color = new Color(0.8f, 0.96f, 1f, 0.9f);
+            GUI.DrawTexture(new Rect(width * 0.5f - thickness * 0.5f, height * 0.5f - gap - length, thickness, length), texture);
+            GUI.DrawTexture(new Rect(width * 0.5f - thickness * 0.5f, height * 0.5f + gap, thickness, length), texture);
+            GUI.DrawTexture(new Rect(width * 0.5f - gap - length, height * 0.5f - thickness * 0.5f, length, thickness), texture);
+            GUI.DrawTexture(new Rect(width * 0.5f + gap, height * 0.5f - thickness * 0.5f, length, thickness), texture);
+            GUI.color = oldColor;
         }
 
         private void EnsureStyles()

@@ -75,6 +75,8 @@ namespace ProjectSun.FPS.Bootstrap
             weapon.Configure(camera, muzzle);
             abilities = playerObject.AddComponent<FpsAbilityController>();
             abilities.Configure(player, weapon);
+            WeaponFeedbackController feedback = playerObject.AddComponent<WeaponFeedbackController>();
+            feedback.Configure(weapon, player, camera, muzzle.parent, muzzle);
             return camera;
         }
 

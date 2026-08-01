@@ -46,6 +46,9 @@ namespace ProjectSun.FPS.Bootstrap
             player.Configure(playerCamera.transform, playerCamera);
             weapon.Configure(playerCamera, muzzle);
             abilities.Configure(player, weapon);
+            WeaponFeedbackController feedback = GetComponent<WeaponFeedbackController>();
+            if (feedback == null) feedback = gameObject.AddComponent<WeaponFeedbackController>();
+            feedback.Configure(weapon, player, playerCamera, muzzle.parent, muzzle);
             if (GetComponent<PlayerRespawnController>() == null)
                 gameObject.AddComponent<PlayerRespawnController>();
             initialized = true;
