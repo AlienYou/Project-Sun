@@ -43,6 +43,8 @@ namespace ProjectSun.FPS.Bootstrap
             player.Configure(playerCamera.transform);
             weapon.Configure(playerCamera, muzzle);
             abilities.Configure(player, weapon);
+            if (GetComponent<PlayerRespawnController>() == null)
+                gameObject.AddComponent<PlayerRespawnController>();
             initialized = true;
         }
 
