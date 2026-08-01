@@ -34,12 +34,45 @@ namespace ProjectSun.FPS.AI
         private float nextPatrolAt;
         private bool isRespawning;
         private bool wasEngaging;
+        private bool combatEnabled;
+        private bool roundRespawnsEnabled = true;
+
+        public bool IsAlive => health != null && health.IsAlive;
 
         public void Configure(Transform playerTransform, ObjectiveZone[] objectives, Vector3 guardPoint)
         {
             player = playerTransform;
             defendedObjectives = objectives ?? System.Array.Empty<ObjectiveZone>();
             guardPosition = guardPoint;
+        }
+
+        public void SetCombatEnabled(bool enabled)
+        {
+            combatEnabled = enabled;
+            if (!enabled && agent != null && agent.enabled)
+                agent.isStopped = true;
+            if (enabled && IsAlive)
+                Patrol();
+        }
+
+        public void SetRoundRespawnsEnabled(bool enabled) => roundRespawnsEnabled = enabled;
+
+        public void ResetForRound()
+        {
+            StopAllCoroutines();
+            isRespawning = false;
+            wasEngaging = false;
+            nextPatrolAt = 0f;
+            if (agent != null && agent.enabled) agent.enabled = false;
+            if (NavMesh.SamplePosition(guardPosition, out NavMeshHit hit, 8f, NavMesh.AllAreas))
+                transform.position = hit.position;
+            else
+                transform.position = guardPosition;
+            health.ResetHealth();
+            foreach (Collider currentCollider in colliders) currentCollider.enabled = true;
+            foreach (Renderer currentRenderer in renderers) currentRenderer.enabled = true;
+            if (agent != null) agent.enabled = true;
+            if (agent != null && agent.enabled) agent.isStopped = true;
         }
 
         private void Awake()
@@ -59,7 +92,6 @@ namespace ProjectSun.FPS.AI
                 if (playerController != null) player = playerController.transform;
             }
             if (guardPosition == Vector3.zero) guardPosition = transform.position;
-            Patrol();
         }
 
         private void OnDestroy()
@@ -69,7 +101,7 @@ namespace ProjectSun.FPS.AI
 
         private void Update()
         {
-            if (isRespawning || player == null || agent == null || !agent.enabled || !agent.isOnNavMesh) return;
+            if (!combatEnabled || isRespawning || player == null || agent == null || !agent.enabled || !agent.isOnNavMesh) return;
 
             Vector3 toPlayer = player.position - transform.position;
             float distance = toPlayer.magnitude;
@@ -160,7 +192,16 @@ namespace ProjectSun.FPS.AI
 
         private void OnDied()
         {
-            if (!isRespawning) StartCoroutine(RespawnRoutine());
+            if (isRespawning) return;
+            if (roundRespawnsEnabled) StartCoroutine(RespawnRoutine());
+            else DisableAfterElimination();
+        }
+
+        private void DisableAfterElimination()
+        {
+            if (agent != null) agent.enabled = false;
+            foreach (Collider currentCollider in colliders) currentCollider.enabled = false;
+            foreach (Renderer currentRenderer in renderers) currentRenderer.enabled = false;
         }
 
         private IEnumerator RespawnRoutine()
@@ -182,7 +223,7 @@ namespace ProjectSun.FPS.AI
             isRespawning = false;
             wasEngaging = false;
             nextPatrolAt = 0f;
-            Patrol();
+            if (combatEnabled) Patrol();
         }
     }
 }

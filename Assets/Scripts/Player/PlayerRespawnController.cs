@@ -19,6 +19,7 @@ namespace ProjectSun.FPS.Player
         private Vector3 spawnPosition;
         private Quaternion spawnRotation;
         private bool isRespawning;
+        private bool roundRespawnsEnabled = true;
 
         private void Awake()
         {
@@ -27,13 +28,9 @@ namespace ProjectSun.FPS.Player
             player = GetComponent<FpsPlayerController>();
             weapon = GetComponent<HitscanWeapon>();
             abilities = GetComponent<FpsAbilityController>();
-            health.Died += OnDied;
-        }
-
-        private void Start()
-        {
             spawnPosition = transform.position;
             spawnRotation = transform.rotation;
+            health.Died += OnDied;
         }
 
         private void OnDestroy()
@@ -43,25 +40,44 @@ namespace ProjectSun.FPS.Player
 
         private void OnDied()
         {
-            if (!isRespawning) StartCoroutine(RespawnRoutine());
+            if (isRespawning) return;
+            SetGameplayEnabled(false);
+            if (roundRespawnsEnabled) StartCoroutine(RespawnRoutine());
+        }
+
+        /// <summary>Round mode disables mid-round respawns while preserving this component for training mode.</summary>
+        public void SetRoundRespawnsEnabled(bool enabled) => roundRespawnsEnabled = enabled;
+
+        public void ResetForRound()
+        {
+            StopAllCoroutines();
+            isRespawning = false;
+            characterController.enabled = false;
+            transform.SetPositionAndRotation(spawnPosition, spawnRotation);
+            health.ResetHealth();
+            characterController.enabled = true;
+            SetGameplayEnabled(true);
         }
 
         private IEnumerator RespawnRoutine()
         {
             isRespawning = true;
-            player.SetGameplayInputEnabled(false);
-            if (weapon != null) weapon.SetGameplayInputEnabled(false);
-            if (abilities != null) abilities.SetGameplayInputEnabled(false);
+            SetGameplayEnabled(false);
             characterController.enabled = false;
             yield return new WaitForSeconds(respawnSeconds);
 
             transform.SetPositionAndRotation(spawnPosition, spawnRotation);
             health.ResetHealth();
             characterController.enabled = true;
-            player.SetGameplayInputEnabled(true);
-            if (weapon != null) weapon.SetGameplayInputEnabled(true);
-            if (abilities != null) abilities.SetGameplayInputEnabled(true);
+            SetGameplayEnabled(true);
             isRespawning = false;
+        }
+
+        private void SetGameplayEnabled(bool enabled)
+        {
+            if (player != null) player.SetGameplayInputEnabled(enabled);
+            if (weapon != null) weapon.SetGameplayInputEnabled(enabled);
+            if (abilities != null) abilities.SetGameplayInputEnabled(enabled);
         }
     }
 }
