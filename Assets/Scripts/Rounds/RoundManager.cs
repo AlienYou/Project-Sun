@@ -27,6 +27,17 @@ namespace ProjectSun.FPS.Rounds
 
         public RoundState State => state;
         public float TimeRemaining => Mathf.Max(0f, stateEndsAt - Time.time);
+        public string ResultReason => resultReason;
+        public int AliveDefenderCount
+        {
+            get
+            {
+                int count = 0;
+                foreach (CombatBotController defender in defenders)
+                    if (defender != null && defender.IsAlive) count++;
+                return count;
+            }
+        }
         public string StateLabel => state switch
         {
             RoundState.Preparation => "PREPARE",

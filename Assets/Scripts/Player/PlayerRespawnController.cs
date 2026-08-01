@@ -21,6 +21,8 @@ namespace ProjectSun.FPS.Player
         private bool isRespawning;
         private bool roundRespawnsEnabled = true;
 
+        public bool IsRespawning => isRespawning;
+
         private void Awake()
         {
             health = GetComponent<Health>();

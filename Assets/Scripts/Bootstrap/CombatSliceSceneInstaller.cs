@@ -46,7 +46,7 @@ namespace ProjectSun.FPS.Bootstrap
             settings.Configure(playerInstaller.Player, playerInstaller.Weapon, playerInstaller.Abilities);
             CombatRayDebugOverlay debugOverlay = GetComponent<CombatRayDebugOverlay>();
             if (debugOverlay == null) debugOverlay = gameObject.AddComponent<CombatRayDebugOverlay>();
-            debugOverlay.Configure(playerInstaller.Player);
+            debugOverlay.Configure(playerInstaller.Player, playerInstaller.Health, roundManager, FindObjectsOfType<CombatBotController>());
         }
     }
 }

@@ -36,8 +36,14 @@ namespace ProjectSun.FPS.AI
         private bool wasEngaging;
         private bool combatEnabled;
         private bool roundRespawnsEnabled = true;
+        private string debugState = "STANDBY";
+        private string latestRayResult = "NO QUERY";
+        private float targetDistance;
 
         public bool IsAlive => health != null && health.IsAlive;
+        public string DebugState => debugState;
+        public string LatestRayResult => latestRayResult;
+        public float TargetDistance => targetDistance;
 
         public void Configure(Transform playerTransform, ObjectiveZone[] objectives, Vector3 guardPoint)
         {
@@ -51,6 +57,7 @@ namespace ProjectSun.FPS.AI
             combatEnabled = enabled;
             if (!enabled && agent != null && agent.enabled)
                 agent.isStopped = true;
+            if (!enabled && IsAlive) debugState = "STANDBY";
             if (enabled && IsAlive)
                 Patrol();
         }
@@ -63,6 +70,7 @@ namespace ProjectSun.FPS.AI
             isRespawning = false;
             wasEngaging = false;
             nextPatrolAt = 0f;
+            debugState = "STANDBY";
             if (agent != null && agent.enabled) agent.enabled = false;
             if (NavMesh.SamplePosition(guardPosition, out NavMeshHit hit, 8f, NavMesh.AllAreas))
                 transform.position = hit.position;
@@ -105,9 +113,11 @@ namespace ProjectSun.FPS.AI
 
             Vector3 toPlayer = player.position - transform.position;
             float distance = toPlayer.magnitude;
+            targetDistance = distance;
             bool canSeePlayer = distance <= detectionRange && HasLineOfSight();
             if (!canSeePlayer)
             {
+                debugState = "PATROL";
                 if (wasEngaging)
                 {
                     wasEngaging = false;
@@ -121,11 +131,13 @@ namespace ProjectSun.FPS.AI
             Face(player.position);
             if (distance > preferredRange)
             {
+                debugState = "CHASE";
                 agent.isStopped = false;
                 agent.SetDestination(player.position);
             }
             else
             {
+                debugState = "FIRE";
                 agent.isStopped = true;
                 TryShootPlayer();
             }
@@ -166,6 +178,11 @@ namespace ProjectSun.FPS.AI
             Ray ray = new Ray(origin, offset.normalized);
             bool hasHit = Physics.Raycast(ray, out hit, rayDistance, CombatLayers.BallisticMask, QueryTriggerInteraction.Ignore);
             bool hitPlayer = hasHit && hit.collider.GetComponentInParent<FpsPlayerController>() != null;
+            string rayStatus = hitPlayer ? "VISIBLE" : "BLOCKED";
+            string rayTarget = hasHit
+                ? string.Concat(hit.collider.name, " L", hit.collider.gameObject.layer, " ", rayStatus)
+                : "MISS";
+            latestRayResult = rayTarget;
             CombatRayDebugOverlay.Record($"DEFENDER {name}", ray, hasHit, hit,
                 hitPlayer ? CombatRayOutcome.Visible : hasHit ? CombatRayOutcome.Blocked : CombatRayOutcome.Miss);
             return hitPlayer;
@@ -193,6 +210,7 @@ namespace ProjectSun.FPS.AI
         private void OnDied()
         {
             if (isRespawning) return;
+            debugState = "ELIMINATED";
             if (roundRespawnsEnabled) StartCoroutine(RespawnRoutine());
             else DisableAfterElimination();
         }
@@ -207,6 +225,7 @@ namespace ProjectSun.FPS.AI
         private IEnumerator RespawnRoutine()
         {
             isRespawning = true;
+            debugState = "RESPAWNING";
             if (agent != null) agent.enabled = false;
             foreach (Collider currentCollider in colliders) currentCollider.enabled = false;
             foreach (Renderer currentRenderer in renderers) currentRenderer.enabled = false;

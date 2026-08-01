@@ -12,6 +12,8 @@ namespace ProjectSun.FPS.Core
         public float Current { get; private set; }
         public float Max => maxHealth;
         public bool IsAlive => Current > 0f;
+        public bool HasLastDamage { get; private set; }
+        public DamageInfo LastDamage { get; private set; }
 
         public event Action<DamageInfo> Damaged;
         public event Action Died;
@@ -21,6 +23,7 @@ namespace ProjectSun.FPS.Core
         public void ResetHealth()
         {
             Current = maxHealth;
+            HasLastDamage = false;
         }
 
         public void ApplyDamage(DamageInfo damage)
@@ -29,6 +32,8 @@ namespace ProjectSun.FPS.Core
                 return;
 
             Current = Mathf.Max(0f, Current - damage.Amount);
+            LastDamage = damage;
+            HasLastDamage = true;
             Damaged?.Invoke(damage);
             if (!IsAlive)
             {
