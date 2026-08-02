@@ -78,6 +78,17 @@ namespace ProjectSun.FPS.Weapons
             weapon = weaponDefinition;
         }
 
+        public void CopyFrom(WeaponLoadout source)
+        {
+            if (source == null) return;
+            weapon = source.weapon;
+            attachments.Clear();
+            foreach (WeaponAttachment attachment in source.attachments)
+                if (attachment != null) attachments.Add(attachment);
+        }
+
+        public void ClearAttachments() => attachments.Clear();
+
         public void Unequip(AttachmentSlot slot)
         {
             attachments.RemoveAll(attachment => attachment != null && attachment.slot == slot);

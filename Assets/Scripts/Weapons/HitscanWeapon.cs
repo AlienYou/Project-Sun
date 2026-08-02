@@ -118,6 +118,15 @@ namespace ProjectSun.FPS.Weapons
             return true;
         }
 
+        /// <summary>Applies an authored primary-slot configuration without exposing mutable weapon state to the UI.</summary>
+        public bool TryApplyLoadout(WeaponLoadout configuredLoadout)
+        {
+            if (!loadoutEditingEnabled || reloading || configuredLoadout == null) return false;
+            loadout.CopyFrom(configuredLoadout);
+            RefreshLoadout();
+            return true;
+        }
+
         private void Fire()
         {
             if (reloading) return;

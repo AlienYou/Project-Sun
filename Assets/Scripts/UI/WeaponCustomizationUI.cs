@@ -17,20 +17,28 @@ namespace ProjectSun.FPS.UI
         private FpsAbilityController abilities;
         private FpsInput input;
         private RoundManager roundManager;
+        private PlayerMatchLoadout matchLoadout;
+        private WeaponLoadoutCatalog catalog;
         private bool ownsRuntimeOptions;
         private bool isOpen;
         private bool wasInPreparation;
+        private LoadoutPage activePage = LoadoutPage.Weapons;
         private GUIStyle titleStyle;
         private GUIStyle bodyStyle;
 
+        private enum LoadoutPage { Weapons, Attachments, Equipment }
+
         public void Configure(HitscanWeapon hitscanWeapon, FpsPlayerController controller, FpsAbilityController abilityController,
-            WeaponLoadoutCatalog catalog = null, RoundManager matchRoundManager = null)
+            WeaponLoadoutCatalog catalog = null, RoundManager matchRoundManager = null,
+            PlayerMatchLoadout playerMatchLoadout = null)
         {
             weapon = hitscanWeapon;
             player = controller;
             input = player != null ? player.Input : null;
             abilities = abilityController;
             roundManager = matchRoundManager;
+            matchLoadout = playerMatchLoadout;
+            this.catalog = catalog;
             if (catalog != null && catalog.Attachments.Count > 0)
             {
                 ReplaceOptionsWithCatalog(catalog);
@@ -71,26 +79,99 @@ namespace ProjectSun.FPS.UI
             float panelHeight = Mathf.Min(620f, Screen.height - 48f);
             Rect panel = new Rect((Screen.width - panelWidth) * 0.5f, (Screen.height - panelHeight) * 0.5f, panelWidth, panelHeight);
             GUI.Box(panel, GUIContent.none);
-            string weaponName = weapon.Loadout.Weapon != null ? weapon.Loadout.Weapon.displayName : "AR-4 CARBINE";
+            string weaponName = PrimaryLoadout.Weapon != null ? PrimaryLoadout.Weapon.displayName : "AR-4 CARBINE";
             GUI.Label(new Rect(panel.x + 26f, panel.y + 20f, 700f, 34f), $"{weaponName.ToUpperInvariant()} // PRE-ROUND LOADOUT", titleStyle);
             GUI.Label(new Rect(panel.x + 26f, panel.y + 55f, 760f, 24f),
                 "Pick one component per slot. Changes lock when the round begins. Press TAB to close.", bodyStyle);
 
-            float columnWidth = (panel.width - 54f) * 0.5f;
-            float left = panel.x + 26f;
-            float top = panel.y + 94f;
-            AttachmentSlot[] slots = { AttachmentSlot.Optic, AttachmentSlot.Muzzle, AttachmentSlot.Barrel, AttachmentSlot.Magazine, AttachmentSlot.Stock };
-            for (int i = 0; i < slots.Length; i++)
-                DrawSlot(slots[i], new Rect(left, top + i * 86f, columnWidth, 78f));
+            DrawPageTabs(panel);
+            Rect content = new Rect(panel.x + 26f, panel.y + 128f, panel.width - 52f, panel.height - 192f);
+            switch (activePage)
+            {
+                case LoadoutPage.Weapons:
+                    DrawWeaponsPage(content);
+                    break;
+                case LoadoutPage.Attachments:
+                    DrawAttachmentsPage(content);
+                    break;
+                case LoadoutPage.Equipment:
+                    DrawEquipmentPage(content);
+                    break;
+            }
 
-            DrawStats(new Rect(left + columnWidth + 28f, top, columnWidth, 280f));
-            if (GUI.Button(new Rect(panel.xMax - 150f, panel.yMax - 50f, 124f, 28f), "RESUME  TAB"))
+            if (GUI.Button(new Rect(panel.xMax - 150f, panel.yMax - 50f, 124f, 28f), "CLOSE  TAB"))
                 SetOpen(false);
         }
 
-        private void DrawSlot(AttachmentSlot slot, Rect area)
+        private void DrawPageTabs(Rect panel)
         {
-            WeaponAttachment equipped = weapon.Loadout.GetEquipped(slot);
+            float x = panel.x + 26f;
+            foreach (LoadoutPage page in new[] { LoadoutPage.Weapons, LoadoutPage.Attachments, LoadoutPage.Equipment })
+            {
+                GUI.enabled = activePage != page;
+                if (GUI.Button(new Rect(x, panel.y + 91f, 130f, 27f), page.ToString().ToUpperInvariant()))
+                    activePage = page;
+                GUI.enabled = true;
+                x += 138f;
+            }
+        }
+
+        private void DrawWeaponsPage(Rect area)
+        {
+            GUI.Label(new Rect(area.x, area.y, area.width, 28f), "WEAPON SLOTS", titleStyle);
+            DrawWeaponChoices("PRIMARY WEAPON", CatalogPrimaryWeapons, CurrentPrimaryWeapon, area.x, area.y + 43f, true);
+            DrawWeaponChoices("SECONDARY WEAPON", CatalogSecondaryWeapons, matchLoadout != null ? matchLoadout.SecondaryWeapon : null,
+                area.x, area.y + 150f, false);
+            GUI.Label(new Rect(area.x, area.y + 263f, area.width, 52f),
+                "Primary is the equipped gameplay weapon. Secondary selection becomes usable when the pistol viewmodel, switching, and independent ammunition are integrated.", bodyStyle);
+        }
+
+        private void DrawWeaponChoices(string label, System.Collections.Generic.IReadOnlyList<WeaponDefinition> choices,
+            WeaponDefinition selected, float left, float top, bool primary)
+        {
+            GUI.Label(new Rect(left, top, 220f, 24f), label, bodyStyle);
+            if (choices == null || choices.Count == 0)
+            {
+                GUI.Label(new Rect(left, top + 30f, 620f, 24f), "NO ELIGIBLE WEAPON HAS BEEN ADDED TO THE CATALOG.", bodyStyle);
+                return;
+            }
+
+            float x = left;
+            bool previousGuiEnabled = GUI.enabled;
+            GUI.enabled = CanEditLoadout;
+            foreach (WeaponDefinition choice in choices)
+            {
+                if (choice == null) continue;
+                string state = choice == selected ? "EQUIPPED" : "SELECT";
+                if (GUI.Button(new Rect(x, top + 30f, 190f, 32f), $"{choice.displayName}  //  {state}"))
+                {
+                    if (matchLoadout != null)
+                    {
+                        if (primary) matchLoadout.TrySelectPrimary(choice);
+                        else matchLoadout.TrySelectSecondary(choice);
+                    }
+                    else if (primary)
+                    {
+                        weapon.SetWeaponDefinition(choice);
+                    }
+                }
+                x += 198f;
+            }
+            GUI.enabled = previousGuiEnabled;
+        }
+
+        private void DrawAttachmentsPage(Rect area)
+        {
+            float columnWidth = (area.width - 28f) * 0.5f;
+            AttachmentSlot[] slots = { AttachmentSlot.Optic, AttachmentSlot.Muzzle, AttachmentSlot.Barrel, AttachmentSlot.Magazine, AttachmentSlot.Stock };
+            for (int i = 0; i < slots.Length; i++)
+                DrawAttachmentSlot(slots[i], new Rect(area.x, area.y + i * 78f, columnWidth, 72f));
+            DrawStats(new Rect(area.x + columnWidth + 28f, area.y, columnWidth, 280f));
+        }
+
+        private void DrawAttachmentSlot(AttachmentSlot slot, Rect area)
+        {
+            WeaponAttachment equipped = PrimaryLoadout.GetEquipped(slot);
             GUI.Label(new Rect(area.x, area.y, 145f, 23f), slot.ToString().ToUpperInvariant(), bodyStyle);
             GUI.Label(new Rect(area.x + 145f, area.y, area.width - 145f, 23f), equipped != null ? equipped.displayName : "STANDARD ISSUE", bodyStyle);
 
@@ -101,11 +182,41 @@ namespace ProjectSun.FPS.UI
             {
                 if (option.slot != slot) continue;
                 if (GUI.Button(new Rect(x, area.y + 29f, 132f, 30f), option.displayName))
-                    weapon.TryEquip(option);
+                {
+                    if (matchLoadout != null) matchLoadout.TryEquipPrimary(option);
+                    else weapon.TryEquip(option);
+                }
                 x += 140f;
             }
             if (GUI.Button(new Rect(x, area.y + 29f, 105f, 30f), "REMOVE"))
-                weapon.TryUnequip(slot);
+            {
+                if (matchLoadout != null) matchLoadout.TryUnequipPrimary(slot);
+                else weapon.TryUnequip(slot);
+            }
+            GUI.enabled = previousGuiEnabled;
+        }
+
+        private void DrawEquipmentPage(Rect area)
+        {
+            GUI.Label(new Rect(area.x, area.y, area.width, 28f), "TACTICAL EQUIPMENT", titleStyle);
+            if (CatalogTacticalEquipment == null || CatalogTacticalEquipment.Count == 0)
+            {
+                GUI.Label(new Rect(area.x, area.y + 44f, area.width, 48f),
+                    "NO TACTICAL EQUIPMENT HAS BEEN ADDED TO THE CATALOG.\nSensor mines and throwables will use this slot without changing the match-loadout format.", bodyStyle);
+                return;
+            }
+
+            float x = area.x;
+            bool previousGuiEnabled = GUI.enabled;
+            GUI.enabled = CanEditLoadout && matchLoadout != null;
+            foreach (TacticalEquipmentDefinition choice in CatalogTacticalEquipment)
+            {
+                if (choice == null) continue;
+                string state = choice == (matchLoadout != null ? matchLoadout.TacticalEquipment : null) ? "EQUIPPED" : "SELECT";
+                if (GUI.Button(new Rect(x, area.y + 44f, 190f, 32f), $"{choice.displayName}  //  {state}"))
+                    matchLoadout.TrySelectTactical(choice);
+                x += 198f;
+            }
             GUI.enabled = previousGuiEnabled;
         }
 
@@ -137,6 +248,14 @@ namespace ProjectSun.FPS.UI
         }
 
         private bool CanEditLoadout => roundManager == null || roundManager.CanEditLoadout;
+        private WeaponLoadout PrimaryLoadout => matchLoadout != null ? matchLoadout.Primary : weapon.Loadout;
+        private WeaponDefinition CurrentPrimaryWeapon => PrimaryLoadout.Weapon;
+        private System.Collections.Generic.IReadOnlyList<WeaponDefinition> CatalogPrimaryWeapons
+            => catalog != null ? catalog.PrimaryWeapons : System.Array.Empty<WeaponDefinition>();
+        private System.Collections.Generic.IReadOnlyList<WeaponDefinition> CatalogSecondaryWeapons
+            => catalog != null ? catalog.SecondaryWeapons : System.Array.Empty<WeaponDefinition>();
+        private System.Collections.Generic.IReadOnlyList<TacticalEquipmentDefinition> CatalogTacticalEquipment
+            => catalog != null ? catalog.TacticalEquipment : System.Array.Empty<TacticalEquipmentDefinition>();
 
         private void CreateOptions()
         {

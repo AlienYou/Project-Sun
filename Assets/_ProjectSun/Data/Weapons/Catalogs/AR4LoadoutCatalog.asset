@@ -13,6 +13,10 @@ MonoBehaviour:
   m_Name: AR4LoadoutCatalog
   m_EditorClassIdentifier: 
   defaultWeapon: {fileID: 11400000, guid: 67abb993db0b8044b941d74fe5a3749b, type: 2}
+  primaryWeapons:
+  - {fileID: 11400000, guid: 67abb993db0b8044b941d74fe5a3749b, type: 2}
+  secondaryWeapons: []
+  tacticalEquipment: []
   attachments:
   - {fileID: 11400000, guid: 0bf13dd4beafcd048bbbf07c828e9020, type: 2}
   - {fileID: 11400000, guid: 8f13106fba53e444a9ecac7d7e45ea9c, type: 2}

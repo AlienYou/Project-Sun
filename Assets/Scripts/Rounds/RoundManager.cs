@@ -314,8 +314,9 @@ namespace ProjectSun.FPS.Rounds
 
         private void SetPlayerLoadoutEditingEnabled(bool enabled)
         {
-            if (playerInstaller != null && playerInstaller.Weapon != null)
-                playerInstaller.Weapon.SetLoadoutEditingEnabled(enabled);
+            if (playerInstaller == null) return;
+            if (playerInstaller.Weapon != null) playerInstaller.Weapon.SetLoadoutEditingEnabled(enabled);
+            if (playerInstaller.MatchLoadout != null) playerInstaller.MatchLoadout.SetEditingEnabled(enabled);
         }
 
         private static void ReloadCurrentScene()

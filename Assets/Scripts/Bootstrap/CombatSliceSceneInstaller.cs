@@ -34,6 +34,8 @@ namespace ProjectSun.FPS.Bootstrap
             playerInstaller.Initialize();
             if (loadoutCatalog != null)
                 playerInstaller.Weapon.SetWeaponDefinition(loadoutCatalog.DefaultWeapon);
+            if (playerInstaller.MatchLoadout != null)
+                playerInstaller.MatchLoadout.Configure(playerInstaller.Weapon, loadoutCatalog);
             RoundManager roundManager = FindObjectOfType<RoundManager>();
             CombatCoverPoint[] coverPoints = FindObjectsOfType<CombatCoverPoint>();
             CombatBotController[] allBots = FindObjectsOfType<CombatBotController>();
@@ -54,7 +56,7 @@ namespace ProjectSun.FPS.Bootstrap
                 hud.Configure(playerInstaller.Weapon, playerInstaller.Abilities, playerInstaller.Health, roundManager);
             if (customization != null)
                 customization.Configure(playerInstaller.Weapon, playerInstaller.Player, playerInstaller.Abilities, loadoutCatalog,
-                    roundManager);
+                    roundManager, playerInstaller.MatchLoadout);
             FpsSettingsMenu settings = GetComponent<FpsSettingsMenu>();
             if (settings == null) settings = gameObject.AddComponent<FpsSettingsMenu>();
             settings.Configure(playerInstaller.Player, playerInstaller.Weapon, playerInstaller.Abilities);

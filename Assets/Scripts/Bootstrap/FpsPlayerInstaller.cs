@@ -20,11 +20,13 @@ namespace ProjectSun.FPS.Bootstrap
         [SerializeField] private Transform muzzle;
 
         private bool initialized;
+        private PlayerMatchLoadout matchLoadout;
 
         public FpsPlayerController Player => player;
         public Health Health => health;
         public HitscanWeapon Weapon => weapon;
         public FpsAbilityController Abilities => abilities;
+        public PlayerMatchLoadout MatchLoadout => matchLoadout;
 
         public void SetReferences(FpsPlayerController controller, Health playerHealth, HitscanWeapon hitscanWeapon,
             FpsAbilityController abilityController, Camera camera, Transform muzzleTransform)
@@ -44,6 +46,9 @@ namespace ProjectSun.FPS.Bootstrap
 
             if (GetComponent<FpsInput>() == null)
                 gameObject.AddComponent<FpsInput>();
+            matchLoadout = GetComponent<PlayerMatchLoadout>();
+            if (matchLoadout == null)
+                matchLoadout = gameObject.AddComponent<PlayerMatchLoadout>();
             player.Configure(playerCamera.transform, playerCamera);
             Transform configuredMuzzle = muzzle;
             Transform weaponVisual = muzzle != null ? muzzle.parent : null;
