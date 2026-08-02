@@ -6,9 +6,11 @@ namespace ProjectSun.FPS.Core
     public static class CombatLayers
     {
         public static int WallLayer => Resolve("Wall", 8);
+        public static int ViewmodelLayer => Resolve("First Person View", 9);
         public static int CharacterLayer => Resolve("Character", 10);
         public static int IgnoreRaycastLayer => Resolve("Ignore Raycast", 2);
         public static int BallisticMask => (1 << WallLayer) | (1 << CharacterLayer);
+        public static int WallMask => 1 << WallLayer;
 
         public static void SetLayerRecursively(GameObject target, int layer)
         {

@@ -6,7 +6,11 @@ using UnityEngine;
 
 namespace ProjectSun.FPS.Weapons
 {
-    /// <summary>Automatic hitscan weapon. Damage, cadence, ammo and spread all come from the current loadout.</summary>
+    /// <summary>
+    /// Automatic hitscan weapon. The camera chooses the intended aim point, then a second ray from the
+    /// muzzle validates the physical path. This preserves screen-centre aiming without allowing a muzzle
+    /// hidden behind cover to damage a target.
+    /// </summary>
     public sealed class HitscanWeapon : MonoBehaviour
     {
         [SerializeField] private WeaponLoadout loadout = new WeaponLoadout();
@@ -22,6 +26,7 @@ namespace ProjectSun.FPS.Weapons
         private float damageMultiplier = 1f;
         private float spreadMultiplier = 1f;
         private bool gameplayInputEnabled = true;
+        private readonly RaycastHit[] ballisticHits = new RaycastHit[16];
 
         public WeaponStats Stats => stats;
         public WeaponLoadout Loadout => loadout;
@@ -114,19 +119,57 @@ namespace ProjectSun.FPS.Weapons
             direction = Quaternion.AngleAxis(random.x, viewCamera.transform.up) * direction;
             direction = Quaternion.AngleAxis(random.y, viewCamera.transform.right) * direction;
 
-            Ray ray = new Ray(viewCamera.transform.position, direction);
-            Vector3 endPoint = ray.GetPoint(stats.range);
-            if (Physics.Raycast(ray, out RaycastHit hit, stats.range, CombatLayers.BallisticMask, QueryTriggerInteraction.Ignore))
+            Ray aimRay = new Ray(viewCamera.transform.position, direction);
+            bool aimHasHit = TryGetFirstBallisticHit(aimRay, stats.range, out RaycastHit aimHit);
+            Vector3 aimPoint = aimHasHit ? aimHit.point : aimRay.GetPoint(stats.range);
+
+            Vector3 muzzleOrigin = muzzle != null ? muzzle.position : aimRay.origin;
+            Vector3 muzzleToAimPoint = aimPoint - muzzleOrigin;
+            float muzzleDistance = muzzleToAimPoint.magnitude;
+            Ray muzzleRay = muzzleDistance > 0.001f
+                ? new Ray(muzzleOrigin, muzzleToAimPoint / muzzleDistance)
+                : aimRay;
+            bool muzzleHasHit = TryGetFirstBallisticHit(muzzleRay, muzzleDistance, out RaycastHit muzzleHit);
+
+            Vector3 endPoint = muzzleHasHit ? muzzleHit.point : aimPoint;
+            bool dealtDamage = false;
+            if (muzzleHasHit)
             {
-                endPoint = hit.point;
-                WeaponImpactEffect.Spawn(hit.point, hit.normal);
-                bool dealtDamage = DealDamage(hit, direction);
-                CombatRayDebugOverlay.Record("PLAYER", ray, true, hit,
-                    dealtDamage ? CombatRayOutcome.DamageApplied : CombatRayOutcome.Blocked);
-                if (dealtDamage) HitConfirmed?.Invoke(hit);
+                WeaponImpactEffect.Spawn(muzzleHit.point, muzzleHit.normal);
+                dealtDamage = DealDamage(muzzleHit, muzzleRay.direction);
+                if (dealtDamage) HitConfirmed?.Invoke(muzzleHit);
             }
-            else CombatRayDebugOverlay.Record("PLAYER", ray, false, default, CombatRayOutcome.Miss);
-            ShotTracer.Spawn(muzzle != null ? muzzle.position : ray.origin, endPoint);
+
+            CombatRayOutcome aimOutcome = !aimHasHit
+                ? CombatRayOutcome.Miss
+                : aimHit.collider.gameObject.layer == CombatLayers.WallLayer
+                    ? CombatRayOutcome.Blocked
+                    : CombatRayOutcome.Visible;
+            CombatRayDebugOverlay.Record("PLAYER AIM", aimRay, aimHasHit, aimHit, aimOutcome);
+            CombatRayDebugOverlay.Record("PLAYER MUZZLE", muzzleRay, muzzleHasHit, muzzleHit,
+                dealtDamage ? CombatRayOutcome.DamageApplied : muzzleHasHit ? CombatRayOutcome.Blocked : CombatRayOutcome.Miss);
+            ShotTracer.Spawn(muzzleOrigin, endPoint);
+        }
+
+        private bool TryGetFirstBallisticHit(Ray ray, float maxDistance, out RaycastHit closestHit)
+        {
+            closestHit = default;
+            if (maxDistance <= 0f) return false;
+
+            int hitCount = Physics.RaycastNonAlloc(ray, ballisticHits, maxDistance, CombatLayers.BallisticMask,
+                QueryTriggerInteraction.Ignore);
+            float closestDistance = float.PositiveInfinity;
+            bool found = false;
+            for (int index = 0; index < hitCount; index++)
+            {
+                RaycastHit candidate = ballisticHits[index];
+                if (candidate.collider == null || candidate.collider.transform.IsChildOf(transform)) continue;
+                if (candidate.distance >= closestDistance) continue;
+                closestDistance = candidate.distance;
+                closestHit = candidate;
+                found = true;
+            }
+            return found;
         }
 
         private bool DealDamage(RaycastHit hit, Vector3 direction)

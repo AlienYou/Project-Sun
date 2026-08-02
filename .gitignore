@@ -52,3 +52,12 @@ crashlytics-build.properties
 # JetBrains Rider local settings
 .idea/
 *.sln.iml
+
+# Local source packages are kept only as Unity import references. Project Sun uses
+# the reviewed runtime copies under Assets/_ProjectSun/Art/ThirdParty instead.
+/Assets/Infima Games/
+/Assets/Infima Games.meta
+/Assets/Low Poly Weapons VOL.1/
+/Assets/Low Poly Weapons VOL.1.meta
+/Assets/LowPolyFPSLite/
+/Assets/LowPolyFPSLite.meta

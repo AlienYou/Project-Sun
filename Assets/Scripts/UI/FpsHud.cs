@@ -9,6 +9,7 @@ namespace ProjectSun.FPS.UI
     /// <summary>Dependency-free prototype HUD. Replace this with UGUI/UI Toolkit presentation later; gameplay stays unchanged.</summary>
     public sealed class FpsHud : MonoBehaviour
     {
+        [SerializeField] private bool hideCrosshairWhileAiming = true;
         private HitscanWeapon weapon;
         private FpsAbilityController abilities;
         private Health health;
@@ -62,7 +63,8 @@ namespace ProjectSun.FPS.UI
                 $"[Q] DASH {Cooldown(abilities.DashCooldownRemaining)}    [E] FOCUS {Cooldown(abilities.FocusCooldownRemaining, abilities.IsFocused)}", textStyle);
             GUI.Label(new Rect(28, 76, 760, 24), "WASD move  SHIFT sprint  SPACE jump  C crouch  RMB aim  R reload  F interact  TAB loadout  O settings", textStyle);
 
-            DrawCrosshair(width, height);
+            if (!hideCrosshairWhileAiming || !weapon.IsAiming)
+                DrawCrosshair(width, height);
             if (Time.time < hitMarkerUntil)
                 GUI.Label(new Rect(width * 0.5f - 15f, height * 0.5f - 20f, 30f, 36f), "X", largeTextStyle);
             if (Time.time < damageWarningUntil)
