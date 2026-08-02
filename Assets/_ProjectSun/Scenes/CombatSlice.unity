@@ -287,7 +287,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxTeamSize: 6
   roundsToWin: 7
-  preparationSeconds: 2
+  preparationSeconds: 5
   roundSeconds: 90
   resultSeconds: 2
   resolveTimeoutByAliveCount: 1

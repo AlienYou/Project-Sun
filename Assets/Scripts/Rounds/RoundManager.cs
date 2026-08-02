@@ -50,6 +50,11 @@ namespace ProjectSun.FPS.Rounds
         public int RoundsToWin => roundsToWin;
         public int AttackerRounds => attackerRounds;
         public int DefenderRounds => defenderRounds;
+        /// <summary>
+        /// Loadout changes are a pre-round decision. Keeping this rule on the match authority makes
+        /// the later networked version a matter of validating the same state on the server.
+        /// </summary>
+        public bool CanEditLoadout => state == RoundState.Preparation;
         public int AliveAttackerCount
         {
             get
@@ -219,6 +224,7 @@ namespace ProjectSun.FPS.Rounds
             resultReason = "ELIMINATE THE ENEMY TEAM";
             ResetCombatants();
             SetPlayerGameplayEnabled(false);
+            SetPlayerLoadoutEditingEnabled(true);
         }
 
         private void BeginRound()
@@ -227,6 +233,7 @@ namespace ProjectSun.FPS.Rounds
             stateEndsAt = Time.time + roundSeconds;
             resultReason = string.Empty;
             if (playerRespawn != null) playerRespawn.SetRoundRespawnsEnabled(false);
+            SetPlayerLoadoutEditingEnabled(false);
             SetPlayerGameplayEnabled(true);
             EnableBotsForRound(attackers);
             EnableBotsForRound(defenders);
@@ -258,6 +265,7 @@ namespace ProjectSun.FPS.Rounds
             if (result == RoundState.AttackersWin) attackerRounds++;
             else if (result == RoundState.DefendersWin) defenderRounds++;
 
+            SetPlayerLoadoutEditingEnabled(false);
             SetPlayerGameplayEnabled(false);
             DisableBots(attackers);
             DisableBots(defenders);
@@ -268,6 +276,7 @@ namespace ProjectSun.FPS.Rounds
             state = RoundState.MatchComplete;
             stateEndsAt = 0f;
             resultReason = attackerRounds > defenderRounds ? "ATTACKERS REACHED MATCH POINT" : "DEFENDERS REACHED MATCH POINT";
+            SetPlayerLoadoutEditingEnabled(false);
             SetPlayerGameplayEnabled(false);
             DisableBots(attackers);
             DisableBots(defenders);
@@ -301,6 +310,12 @@ namespace ProjectSun.FPS.Rounds
             if (playerInstaller.Player != null) playerInstaller.Player.SetGameplayInputEnabled(enabled);
             if (playerInstaller.Weapon != null) playerInstaller.Weapon.SetGameplayInputEnabled(enabled);
             if (playerInstaller.Abilities != null) playerInstaller.Abilities.SetGameplayInputEnabled(enabled);
+        }
+
+        private void SetPlayerLoadoutEditingEnabled(bool enabled)
+        {
+            if (playerInstaller != null && playerInstaller.Weapon != null)
+                playerInstaller.Weapon.SetLoadoutEditingEnabled(enabled);
         }
 
         private static void ReloadCurrentScene()

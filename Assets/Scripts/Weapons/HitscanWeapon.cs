@@ -26,6 +26,7 @@ namespace ProjectSun.FPS.Weapons
         private float damageMultiplier = 1f;
         private float spreadMultiplier = 1f;
         private bool gameplayInputEnabled = true;
+        private bool loadoutEditingEnabled = true;
         private readonly RaycastHit[] ballisticHits = new RaycastHit[16];
 
         public WeaponStats Stats => stats;
@@ -34,6 +35,7 @@ namespace ProjectSun.FPS.Weapons
         public bool IsReloading => reloading;
         public bool IsAiming { get; private set; }
         public float ReloadProgress { get; private set; }
+        public bool LoadoutEditingEnabled => loadoutEditingEnabled;
 
         public event Action<RaycastHit> HitConfirmed;
         public event Action Fired;
@@ -54,11 +56,13 @@ namespace ProjectSun.FPS.Weapons
                 ammoInMagazine = stats.magazineSize;
         }
 
-        public void SetWeaponDefinition(WeaponDefinition definition)
+        /// <summary>Changes the primary weapon only while the match has enabled pre-round editing.</summary>
+        public bool SetWeaponDefinition(WeaponDefinition definition)
         {
-            if (definition == null) return;
+            if (!loadoutEditingEnabled || definition == null) return false;
             loadout.SetWeapon(definition);
             RefreshLoadout();
+            return true;
         }
 
         public void SetAbilityModifiers(float newDamageMultiplier, float newSpreadMultiplier)
@@ -72,6 +76,12 @@ namespace ProjectSun.FPS.Weapons
             gameplayInputEnabled = enabled;
             if (!enabled) IsAiming = false;
         }
+
+        /// <summary>
+        /// Controlled by the round authority. It protects the gameplay API as well as the visible
+        /// loadout menu, so active-round edits cannot change a weapon's replicated state later.
+        /// </summary>
+        public void SetLoadoutEditingEnabled(bool enabled) => loadoutEditingEnabled = enabled;
 
         private void Awake()
         {
@@ -94,8 +104,16 @@ namespace ProjectSun.FPS.Weapons
 
         public bool TryEquip(WeaponAttachment attachment)
         {
-            if (reloading || attachment == null) return false;
+            if (!loadoutEditingEnabled || reloading || attachment == null) return false;
             loadout.Equip(attachment);
+            RefreshLoadout();
+            return true;
+        }
+
+        public bool TryUnequip(AttachmentSlot slot)
+        {
+            if (!loadoutEditingEnabled || reloading) return false;
+            loadout.Unequip(slot);
             RefreshLoadout();
             return true;
         }

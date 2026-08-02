@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using ProjectSun.FPS.Abilities;
 using ProjectSun.FPS.Input;
 using ProjectSun.FPS.Player;
+using ProjectSun.FPS.Rounds;
 using ProjectSun.FPS.Weapons;
 using UnityEngine;
 
@@ -15,18 +16,21 @@ namespace ProjectSun.FPS.UI
         private FpsPlayerController player;
         private FpsAbilityController abilities;
         private FpsInput input;
+        private RoundManager roundManager;
         private bool ownsRuntimeOptions;
         private bool isOpen;
+        private bool wasInPreparation;
         private GUIStyle titleStyle;
         private GUIStyle bodyStyle;
 
         public void Configure(HitscanWeapon hitscanWeapon, FpsPlayerController controller, FpsAbilityController abilityController,
-            WeaponLoadoutCatalog catalog = null)
+            WeaponLoadoutCatalog catalog = null, RoundManager matchRoundManager = null)
         {
             weapon = hitscanWeapon;
             player = controller;
             input = player != null ? player.Input : null;
             abilities = abilityController;
+            roundManager = matchRoundManager;
             if (catalog != null && catalog.Attachments.Count > 0)
             {
                 ReplaceOptionsWithCatalog(catalog);
@@ -40,7 +44,15 @@ namespace ProjectSun.FPS.UI
 
         private void Update()
         {
-            if (input != null && (isOpen || input.GameplayEnabled) && !input.IsRebinding && input.WasPressed(FpsBinding.Loadout))
+            bool isPreparation = roundManager != null && roundManager.State == RoundState.Preparation;
+            if (roundManager != null && isPreparation && !wasInPreparation)
+                SetOpen(true);
+            wasInPreparation = isPreparation;
+
+            if (isOpen && !CanEditLoadout)
+                SetOpen(false);
+
+            if (input != null && CanEditLoadout && !input.IsRebinding && input.WasPressed(FpsBinding.Loadout))
                 SetOpen(!isOpen);
         }
 
@@ -60,8 +72,9 @@ namespace ProjectSun.FPS.UI
             Rect panel = new Rect((Screen.width - panelWidth) * 0.5f, (Screen.height - panelHeight) * 0.5f, panelWidth, panelHeight);
             GUI.Box(panel, GUIContent.none);
             string weaponName = weapon.Loadout.Weapon != null ? weapon.Loadout.Weapon.displayName : "AR-4 CARBINE";
-            GUI.Label(new Rect(panel.x + 26f, panel.y + 20f, 600f, 34f), $"{weaponName.ToUpperInvariant()} // FIELD LOADOUT", titleStyle);
-            GUI.Label(new Rect(panel.x + 26f, panel.y + 55f, 660f, 24f), "Pick one component per slot. Changes apply immediately. Press TAB to resume.", bodyStyle);
+            GUI.Label(new Rect(panel.x + 26f, panel.y + 20f, 700f, 34f), $"{weaponName.ToUpperInvariant()} // PRE-ROUND LOADOUT", titleStyle);
+            GUI.Label(new Rect(panel.x + 26f, panel.y + 55f, 760f, 24f),
+                "Pick one component per slot. Changes lock when the round begins. Press TAB to close.", bodyStyle);
 
             float columnWidth = (panel.width - 54f) * 0.5f;
             float left = panel.x + 26f;
@@ -81,6 +94,8 @@ namespace ProjectSun.FPS.UI
             GUI.Label(new Rect(area.x, area.y, 145f, 23f), slot.ToString().ToUpperInvariant(), bodyStyle);
             GUI.Label(new Rect(area.x + 145f, area.y, area.width - 145f, 23f), equipped != null ? equipped.displayName : "STANDARD ISSUE", bodyStyle);
 
+            bool previousGuiEnabled = GUI.enabled;
+            GUI.enabled = CanEditLoadout;
             float x = area.x;
             foreach (WeaponAttachment option in options)
             {
@@ -90,10 +105,8 @@ namespace ProjectSun.FPS.UI
                 x += 140f;
             }
             if (GUI.Button(new Rect(x, area.y + 29f, 105f, 30f), "REMOVE"))
-            {
-                weapon.Loadout.Unequip(slot);
-                weapon.RefreshLoadout();
-            }
+                weapon.TryUnequip(slot);
+            GUI.enabled = previousGuiEnabled;
         }
 
         private void DrawStats(Rect area)
@@ -112,11 +125,18 @@ namespace ProjectSun.FPS.UI
 
         private void SetOpen(bool open)
         {
+            if (open && !CanEditLoadout) return;
             isOpen = open;
+
+            // RoundManager is the authority for gameplay input. The loadout screen must not
+            // accidentally re-enable movement while the team is still in its preparation phase.
+            if (roundManager != null) return;
             if (player != null) player.SetGameplayInputEnabled(!open);
             if (weapon != null) weapon.SetGameplayInputEnabled(!open);
             if (abilities != null) abilities.SetGameplayInputEnabled(!open);
         }
+
+        private bool CanEditLoadout => roundManager == null || roundManager.CanEditLoadout;
 
         private void CreateOptions()
         {
