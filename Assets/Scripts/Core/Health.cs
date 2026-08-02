@@ -17,6 +17,8 @@ namespace ProjectSun.FPS.Core
 
         public event Action<DamageInfo> Damaged;
         public event Action Died;
+        /// <summary>Optional gameplay rules can reject damage before health is modified.</summary>
+        public event Func<DamageInfo, bool> DamagePermissionRequested;
 
         private void Awake() => Current = maxHealth;
 
@@ -30,6 +32,8 @@ namespace ProjectSun.FPS.Core
         {
             if (!IsAlive || damage.Amount <= 0f)
                 return;
+            if (!CanReceiveDamage(damage))
+                return;
 
             Current = Mathf.Max(0f, Current - damage.Amount);
             LastDamage = damage;
@@ -41,6 +45,14 @@ namespace ProjectSun.FPS.Core
                 if (destroyWhenDead)
                     Destroy(gameObject, 0.05f);
             }
+        }
+
+        private bool CanReceiveDamage(DamageInfo damage)
+        {
+            if (DamagePermissionRequested == null) return true;
+            foreach (Delegate subscription in DamagePermissionRequested.GetInvocationList())
+                if (subscription is Func<DamageInfo, bool> rule && !rule.Invoke(damage)) return false;
+            return true;
         }
     }
 }

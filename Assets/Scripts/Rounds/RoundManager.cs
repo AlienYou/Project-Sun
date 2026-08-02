@@ -31,6 +31,7 @@ namespace ProjectSun.FPS.Rounds
 
         [Header("Combatants")]
         [SerializeField] private FpsPlayerInstaller playerInstaller;
+        [SerializeField] private CombatBotController[] attackers = System.Array.Empty<CombatBotController>();
         [SerializeField] private CombatBotController[] defenders = System.Array.Empty<CombatBotController>();
 
         private RoundState state;
@@ -38,6 +39,7 @@ namespace ProjectSun.FPS.Rounds
         private string resultReason = string.Empty;
         private Health playerHealth;
         private PlayerRespawnController playerRespawn;
+        private TeamCombatant playerCombatant;
         private int attackerRounds;
         private int defenderRounds;
 
@@ -48,7 +50,16 @@ namespace ProjectSun.FPS.Rounds
         public int RoundsToWin => roundsToWin;
         public int AttackerRounds => attackerRounds;
         public int DefenderRounds => defenderRounds;
-        public int AliveAttackerCount => playerHealth != null && playerHealth.IsAlive ? 1 : 0;
+        public int AliveAttackerCount
+        {
+            get
+            {
+                int count = playerHealth != null && playerHealth.IsAlive ? 1 : 0;
+                foreach (CombatBotController attacker in attackers)
+                    if (attacker != null && attacker.IsAlive) count++;
+                return count;
+            }
+        }
         public int AliveDefenderCount
         {
             get
@@ -94,19 +105,55 @@ namespace ProjectSun.FPS.Rounds
         public void SetObjectives(ObjectiveZone[] _) { }
 
         public void ConfigureCombatants(FpsPlayerInstaller player, CombatBotController[] defenderBots)
+            => ConfigureCombatants(player, System.Array.Empty<CombatBotController>(), defenderBots);
+
+        public void ConfigureCombatants(FpsPlayerInstaller player, CombatBotController[] attackerBots,
+            CombatBotController[] defenderBots)
         {
             if (playerHealth != null) playerHealth.Died -= OnPlayerDied;
             playerInstaller = player;
+            attackers = attackerBots ?? System.Array.Empty<CombatBotController>();
             defenders = defenderBots ?? System.Array.Empty<CombatBotController>();
             playerHealth = playerInstaller != null ? playerInstaller.Health : null;
             playerRespawn = playerInstaller != null ? playerInstaller.GetComponent<PlayerRespawnController>() : null;
+            playerCombatant = EnsureCombatant(playerInstaller != null ? playerInstaller.gameObject : null, CombatTeam.Attackers);
+            ConfigureBotTeams(attackers, CombatTeam.Attackers);
+            ConfigureBotTeams(defenders, CombatTeam.Defenders);
+            ValidateTeamCapacity();
             if (playerHealth != null) playerHealth.Died += OnPlayerDied;
+        }
+
+        /// <summary>Returns the closest living member of the opposing team for offline bot validation.</summary>
+        public Transform GetTargetFor(CombatBotController requester)
+        {
+            if (requester == null) return null;
+            TeamCombatant requesterCombatant = requester.GetComponent<TeamCombatant>();
+            if (requesterCombatant == null || requesterCombatant.Team == CombatTeam.None) return null;
+
+            CombatTeam opposingTeam = requesterCombatant.Team == CombatTeam.Attackers
+                ? CombatTeam.Defenders
+                : CombatTeam.Attackers;
+            Transform closest = null;
+            float closestDistance = float.MaxValue;
+
+            if (opposingTeam == CombatTeam.Attackers)
+            {
+                ConsiderTarget(playerCombatant, requester.transform.position, ref closest, ref closestDistance);
+                ConsiderTargets(attackers, requester.transform.position, ref closest, ref closestDistance);
+            }
+            else
+            {
+                ConsiderTargets(defenders, requester.transform.position, ref closest, ref closestDistance);
+            }
+
+            return closest;
         }
 
         private void Start()
         {
             if (playerInstaller == null)
-                ConfigureCombatants(FindObjectOfType<FpsPlayerInstaller>(), FindObjectsOfType<CombatBotController>());
+                ConfigureCombatants(FindObjectOfType<FpsPlayerInstaller>(), System.Array.Empty<CombatBotController>(),
+                    FindObjectsOfType<CombatBotController>());
             RestartMatch();
         }
 
@@ -181,12 +228,8 @@ namespace ProjectSun.FPS.Rounds
             resultReason = string.Empty;
             if (playerRespawn != null) playerRespawn.SetRoundRespawnsEnabled(false);
             SetPlayerGameplayEnabled(true);
-            foreach (CombatBotController defender in defenders)
-            {
-                if (defender == null) continue;
-                defender.SetRoundRespawnsEnabled(false);
-                defender.SetCombatEnabled(true);
-            }
+            EnableBotsForRound(attackers);
+            EnableBotsForRound(defenders);
         }
 
         private void ResolveRoundTimeout()
@@ -216,8 +259,8 @@ namespace ProjectSun.FPS.Rounds
             else if (result == RoundState.DefendersWin) defenderRounds++;
 
             SetPlayerGameplayEnabled(false);
-            foreach (CombatBotController defender in defenders)
-                if (defender != null) defender.SetCombatEnabled(false);
+            DisableBots(attackers);
+            DisableBots(defenders);
         }
 
         private void BeginMatchComplete()
@@ -226,13 +269,13 @@ namespace ProjectSun.FPS.Rounds
             stateEndsAt = 0f;
             resultReason = attackerRounds > defenderRounds ? "ATTACKERS REACHED MATCH POINT" : "DEFENDERS REACHED MATCH POINT";
             SetPlayerGameplayEnabled(false);
-            foreach (CombatBotController defender in defenders)
-                if (defender != null) defender.SetCombatEnabled(false);
+            DisableBots(attackers);
+            DisableBots(defenders);
         }
 
         private void OnPlayerDied()
         {
-            if (state == RoundState.Active)
+            if (state == RoundState.Active && AliveAttackerCount == 0)
                 FinishRound(RoundState.DefendersWin, "ATTACKERS ELIMINATED");
         }
 
@@ -248,13 +291,8 @@ namespace ProjectSun.FPS.Rounds
                 playerHealth?.ResetHealth();
             }
 
-            foreach (CombatBotController defender in defenders)
-            {
-                if (defender == null) continue;
-                defender.SetCombatEnabled(false);
-                defender.SetRoundRespawnsEnabled(true);
-                defender.ResetForRound();
-            }
+            ResetBotsForRound(attackers);
+            ResetBotsForRound(defenders);
         }
 
         private void SetPlayerGameplayEnabled(bool enabled)
@@ -270,6 +308,76 @@ namespace ProjectSun.FPS.Rounds
             Scene activeScene = SceneManager.GetActiveScene();
             if (!string.IsNullOrEmpty(activeScene.name))
                 SceneManager.LoadScene(activeScene.name);
+        }
+
+        private static TeamCombatant EnsureCombatant(GameObject combatantObject, CombatTeam team)
+        {
+            if (combatantObject == null) return null;
+            TeamCombatant combatant = combatantObject.GetComponent<TeamCombatant>();
+            if (combatant == null) combatant = combatantObject.AddComponent<TeamCombatant>();
+            combatant.SetTeam(team);
+            return combatant;
+        }
+
+        private static void ConfigureBotTeams(CombatBotController[] bots, CombatTeam team)
+        {
+            foreach (CombatBotController bot in bots)
+                if (bot != null) EnsureCombatant(bot.gameObject, team);
+        }
+
+        private void ValidateTeamCapacity()
+        {
+            int attackerCount = (playerInstaller != null ? 1 : 0) + attackers.Length;
+            if (attackerCount > maxTeamSize)
+                Debug.LogWarning($"Attackers have {attackerCount} combatants but the mode maximum is {maxTeamSize}.", this);
+            if (defenders.Length > maxTeamSize)
+                Debug.LogWarning($"Defenders have {defenders.Length} combatants but the mode maximum is {maxTeamSize}.", this);
+        }
+
+        private static void ConsiderTarget(TeamCombatant candidate, Vector3 origin, ref Transform closest, ref float closestDistance)
+        {
+            if (candidate == null || !candidate.IsAlive) return;
+            float distance = (candidate.transform.position - origin).sqrMagnitude;
+            if (distance >= closestDistance) return;
+            closest = candidate.transform;
+            closestDistance = distance;
+        }
+
+        private static void ConsiderTargets(CombatBotController[] candidates, Vector3 origin, ref Transform closest,
+            ref float closestDistance)
+        {
+            foreach (CombatBotController candidate in candidates)
+            {
+                if (candidate == null) continue;
+                ConsiderTarget(candidate.GetComponent<TeamCombatant>(), origin, ref closest, ref closestDistance);
+            }
+        }
+
+        private static void EnableBotsForRound(CombatBotController[] bots)
+        {
+            foreach (CombatBotController bot in bots)
+            {
+                if (bot == null) continue;
+                bot.SetRoundRespawnsEnabled(false);
+                bot.SetCombatEnabled(true);
+            }
+        }
+
+        private static void DisableBots(CombatBotController[] bots)
+        {
+            foreach (CombatBotController bot in bots)
+                if (bot != null) bot.SetCombatEnabled(false);
+        }
+
+        private static void ResetBotsForRound(CombatBotController[] bots)
+        {
+            foreach (CombatBotController bot in bots)
+            {
+                if (bot == null) continue;
+                bot.SetCombatEnabled(false);
+                bot.SetRoundRespawnsEnabled(true);
+                bot.ResetForRound();
+            }
         }
     }
 }

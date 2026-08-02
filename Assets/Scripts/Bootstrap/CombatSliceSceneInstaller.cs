@@ -36,10 +36,20 @@ namespace ProjectSun.FPS.Bootstrap
                 playerInstaller.Weapon.SetWeaponDefinition(loadoutCatalog.DefaultWeapon);
             RoundManager roundManager = FindObjectOfType<RoundManager>();
             CombatCoverPoint[] coverPoints = FindObjectsOfType<CombatCoverPoint>();
-            foreach (CombatBotController defender in FindObjectsOfType<CombatBotController>())
-                defender.SetCoverPoints(coverPoints);
+            CombatBotController[] allBots = FindObjectsOfType<CombatBotController>();
+            System.Collections.Generic.List<CombatBotController> attackers = new System.Collections.Generic.List<CombatBotController>();
+            System.Collections.Generic.List<CombatBotController> defenders = new System.Collections.Generic.List<CombatBotController>();
+            foreach (CombatBotController bot in allBots)
+            {
+                bot.SetCoverPoints(coverPoints);
+                TeamCombatant combatant = bot.GetComponent<TeamCombatant>();
+                if (combatant != null && combatant.Team == CombatTeam.Attackers)
+                    attackers.Add(bot);
+                else
+                    defenders.Add(bot);
+            }
             if (roundManager != null)
-                roundManager.ConfigureCombatants(playerInstaller, FindObjectsOfType<CombatBotController>());
+                roundManager.ConfigureCombatants(playerInstaller, attackers.ToArray(), defenders.ToArray());
             if (hud != null)
                 hud.Configure(playerInstaller.Weapon, playerInstaller.Abilities, playerInstaller.Health, roundManager);
             if (customization != null)
@@ -49,7 +59,7 @@ namespace ProjectSun.FPS.Bootstrap
             settings.Configure(playerInstaller.Player, playerInstaller.Weapon, playerInstaller.Abilities);
             CombatRayDebugOverlay debugOverlay = GetComponent<CombatRayDebugOverlay>();
             if (debugOverlay == null) debugOverlay = gameObject.AddComponent<CombatRayDebugOverlay>();
-            debugOverlay.Configure(playerInstaller.Player, playerInstaller.Health, roundManager, FindObjectsOfType<CombatBotController>());
+            debugOverlay.Configure(playerInstaller.Player, playerInstaller.Health, roundManager, allBots);
         }
     }
 }

@@ -44,6 +44,7 @@ namespace ProjectSun.FPS.AI
         private float targetDistance;
         private CombatCoverPoint currentCover;
         private bool movingToPeek;
+        private RoundManager roundManager;
 
         public bool IsAlive => health != null && health.IsAlive;
         public string DebugState => currentCover != null ? $"{debugState} [{currentCover.name}]" : debugState;
@@ -105,6 +106,7 @@ namespace ProjectSun.FPS.AI
 
         private void Start()
         {
+            roundManager = FindObjectOfType<RoundManager>();
             if (player == null)
             {
                 FpsPlayerController playerController = FindObjectOfType<FpsPlayerController>();
@@ -121,7 +123,17 @@ namespace ProjectSun.FPS.AI
 
         private void Update()
         {
-            if (!combatEnabled || isRespawning || player == null || agent == null || !agent.enabled || !agent.isOnNavMesh) return;
+            if (!combatEnabled || isRespawning || agent == null || !agent.enabled || !agent.isOnNavMesh) return;
+
+            if (roundManager != null)
+                player = roundManager.GetTargetFor(this);
+            if (player == null)
+            {
+                ReleaseCover();
+                debugState = "NO ENEMY";
+                Patrol();
+                return;
+            }
 
             Vector3 toPlayer = player.position - transform.position;
             float distance = toPlayer.magnitude;
@@ -259,13 +271,15 @@ namespace ProjectSun.FPS.AI
             float rayDistance = offset.magnitude;
             Ray ray = new Ray(origin, offset.normalized);
             bool hasHit = Physics.Raycast(ray, out hit, rayDistance, CombatLayers.BallisticMask, QueryTriggerInteraction.Ignore);
-            bool hitPlayer = hasHit && hit.collider.GetComponentInParent<FpsPlayerController>() != null;
+            Health targetHealth = player != null ? player.GetComponent<Health>() : null;
+            Health hitHealth = hasHit ? hit.collider.GetComponentInParent<Health>() : null;
+            bool hitPlayer = targetHealth != null && hitHealth == targetHealth;
             string rayStatus = hitPlayer ? "VISIBLE" : "BLOCKED";
             string rayTarget = hasHit
                 ? string.Concat(hit.collider.name, " L", hit.collider.gameObject.layer, " ", rayStatus)
                 : "MISS";
             latestRayResult = rayTarget;
-            CombatRayDebugOverlay.Record($"DEFENDER {name}", ray, hasHit, hit,
+            CombatRayDebugOverlay.Record($"BOT {name}", ray, hasHit, hit,
                 hitPlayer ? CombatRayOutcome.Visible : hasHit ? CombatRayOutcome.Blocked : CombatRayOutcome.Miss);
             return hitPlayer;
         }
@@ -286,7 +300,7 @@ namespace ProjectSun.FPS.AI
             nextShotAt = Time.time + 1f / shotsPerSecond;
             Vector3 direction = (player.position - transform.position).normalized;
             playerHealth.ApplyDamage(new DamageInfo(shotDamage, hit.point, direction, gameObject));
-            CombatRayDebugOverlay.MarkDamageApplied($"DEFENDER {name}");
+            CombatRayDebugOverlay.MarkDamageApplied($"BOT {name}");
         }
 
         private void OnDied()
