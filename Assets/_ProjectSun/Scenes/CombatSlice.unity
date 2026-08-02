@@ -285,12 +285,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 63573c3b8c481f9459cfe91447aa7faf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  preparationSeconds: 6
+  maxTeamSize: 6
+  roundsToWin: 7
+  preparationSeconds: 3
   roundSeconds: 180
-  resultSeconds: 3
-  objectives:
-  - {fileID: 139365165}
-  - {fileID: 1309913064}
+  resultSeconds: 2
+  resolveTimeoutByAliveCount: 1
+  allowFastRestart: 1
+  fastRestartKey: 289
   playerInstaller: {fileID: 0}
   defenders: []
 --- !u!114 &92926360

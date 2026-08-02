@@ -52,16 +52,21 @@ namespace ProjectSun.FPS.UI
             string reload = weapon.IsReloading ? $"RELOADING  {weapon.ReloadProgress:P0}" : weapon.IsAiming ? "AIMED" : "HIP FIRE";
             GUI.Label(new Rect(width - 210, height - 82, 180, 26), reload, textStyle);
 
-            GUI.Label(new Rect(28, 24, 510, 25), "PROJECT SUN // COMBAT TRAINING RANGE", textStyle);
+            GUI.Label(new Rect(28, 24, 510, 25), roundManager != null
+                ? "PROJECT SUN // TEAM ELIMINATION"
+                : "PROJECT SUN // COMBAT TRAINING RANGE", textStyle);
             if (roundManager != null)
             {
                 GUI.Label(new Rect(width - 250f, 24, 220f, 25),
                     $"{roundManager.StateLabel}  {Mathf.CeilToInt(roundManager.TimeRemaining):000}s", textStyle);
+                GUI.Label(new Rect(width - 250f, 50f, 220f, 25), roundManager.ScoreLabel, textStyle);
                 GUI.Label(new Rect(28, 102, 640f, 24), roundManager.ObjectiveText, textStyle);
             }
             GUI.Label(new Rect(28, 50, 550, 24),
                 $"[Q] DASH {Cooldown(abilities.DashCooldownRemaining)}    [E] FOCUS {Cooldown(abilities.FocusCooldownRemaining, abilities.IsFocused)}", textStyle);
-            GUI.Label(new Rect(28, 76, 760, 24), "WASD move  SHIFT sprint  SPACE jump  C crouch  RMB aim  R reload  F interact  TAB loadout  O settings", textStyle);
+            GUI.Label(new Rect(28, 76, 840, 24), roundManager != null
+                ? "WASD move  SHIFT sprint  SPACE jump  C crouch  RMB aim  R reload  TAB loadout  O settings  F8 restart match"
+                : "WASD move  SHIFT sprint  SPACE jump  C crouch  RMB aim  R reload  F interact  TAB loadout  O settings", textStyle);
 
             if (!hideCrosshairWhileAiming || !weapon.IsAiming)
                 DrawCrosshair(width, height);
