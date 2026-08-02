@@ -36,6 +36,8 @@ namespace ProjectSun.FPS.Bootstrap
                 playerInstaller.Weapon.SetWeaponDefinition(loadoutCatalog.DefaultWeapon);
             if (playerInstaller.MatchLoadout != null)
                 playerInstaller.MatchLoadout.Configure(playerInstaller.Weapon, loadoutCatalog);
+            if (playerInstaller.WeaponInventory != null)
+                playerInstaller.WeaponInventory.Configure(playerInstaller);
             RoundManager roundManager = FindObjectOfType<RoundManager>();
             CombatCoverPoint[] coverPoints = FindObjectsOfType<CombatCoverPoint>();
             CombatBotController[] allBots = FindObjectsOfType<CombatBotController>();

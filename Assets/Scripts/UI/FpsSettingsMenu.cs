@@ -13,7 +13,8 @@ namespace ProjectSun.FPS.UI
         {
             FpsBinding.MoveForward, FpsBinding.MoveBackward, FpsBinding.MoveLeft, FpsBinding.MoveRight,
             FpsBinding.Fire, FpsBinding.Aim, FpsBinding.Jump, FpsBinding.Sprint, FpsBinding.Crouch,
-            FpsBinding.Reload, FpsBinding.Dash, FpsBinding.Focus, FpsBinding.Interact, FpsBinding.Loadout
+            FpsBinding.Reload, FpsBinding.SelectPrimary, FpsBinding.SelectSecondary, FpsBinding.Dash, FpsBinding.Focus,
+            FpsBinding.Interact, FpsBinding.Loadout
         };
 
         private FpsPlayerController player;
@@ -80,10 +81,11 @@ namespace ProjectSun.FPS.UI
         {
             const float rowHeight = 36f;
             float columnWidth = (area.width - 18f) * 0.5f;
+            int rowsPerColumn = Mathf.CeilToInt(RebindableBindings.Length * 0.5f);
             for (int i = 0; i < RebindableBindings.Length; i++)
             {
-                int column = i / 7;
-                int row = i % 7;
+                int column = i / rowsPerColumn;
+                int row = i % rowsPerColumn;
                 FpsBinding binding = RebindableBindings[i];
                 float x = area.x + column * (columnWidth + 18f);
                 float y = area.y + row * rowHeight;
@@ -116,6 +118,8 @@ namespace ProjectSun.FPS.UI
                 case FpsBinding.MoveBackward: return "MOVE BACKWARD";
                 case FpsBinding.MoveLeft: return "MOVE LEFT";
                 case FpsBinding.MoveRight: return "MOVE RIGHT";
+                case FpsBinding.SelectPrimary: return "SELECT PRIMARY";
+                case FpsBinding.SelectSecondary: return "SELECT SECONDARY";
                 default: return binding.ToString().ToUpperInvariant();
             }
         }

@@ -21,12 +21,15 @@ namespace ProjectSun.FPS.Bootstrap
 
         private bool initialized;
         private PlayerMatchLoadout matchLoadout;
+        private WeaponInventoryController weaponInventory;
 
         public FpsPlayerController Player => player;
         public Health Health => health;
         public HitscanWeapon Weapon => weapon;
         public FpsAbilityController Abilities => abilities;
         public PlayerMatchLoadout MatchLoadout => matchLoadout;
+        public WeaponInventoryController WeaponInventory => weaponInventory;
+        public Camera PlayerCamera => playerCamera;
 
         public void SetReferences(FpsPlayerController controller, Health playerHealth, HitscanWeapon hitscanWeapon,
             FpsAbilityController abilityController, Camera camera, Transform muzzleTransform)
@@ -49,6 +52,9 @@ namespace ProjectSun.FPS.Bootstrap
             matchLoadout = GetComponent<PlayerMatchLoadout>();
             if (matchLoadout == null)
                 matchLoadout = gameObject.AddComponent<PlayerMatchLoadout>();
+            weaponInventory = GetComponent<WeaponInventoryController>();
+            if (weaponInventory == null)
+                weaponInventory = gameObject.AddComponent<WeaponInventoryController>();
             player.Configure(playerCamera.transform, playerCamera);
             Transform configuredMuzzle = muzzle;
             Transform weaponVisual = muzzle != null ? muzzle.parent : null;

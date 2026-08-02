@@ -17,6 +17,7 @@ namespace ProjectSun.FPS.Weapons
         public WeaponDefinition DefaultPrimaryWeapon => primaryWeapons.Count > 0 && primaryWeapons[0] != null
             ? primaryWeapons[0]
             : defaultWeapon;
+        public WeaponDefinition DefaultSecondaryWeapon => secondaryWeapons.Count > 0 ? secondaryWeapons[0] : null;
         public IReadOnlyList<WeaponDefinition> PrimaryWeapons => primaryWeapons;
         public IReadOnlyList<WeaponDefinition> SecondaryWeapons => secondaryWeapons;
         public IReadOnlyList<TacticalEquipmentDefinition> TacticalEquipment => tacticalEquipment;
@@ -34,6 +35,16 @@ namespace ProjectSun.FPS.Weapons
                     attachments.Add(attachment);
         }
 
+        public void SetWeaponSlots(IEnumerable<WeaponDefinition> availablePrimaryWeapons,
+            IEnumerable<WeaponDefinition> availableSecondaryWeapons)
+        {
+            primaryWeapons.Clear();
+            secondaryWeapons.Clear();
+            AddWeapons(primaryWeapons, availablePrimaryWeapons);
+            AddWeapons(secondaryWeapons, availableSecondaryWeapons);
+            defaultWeapon = DefaultPrimaryWeapon;
+        }
+
         public bool IsPrimaryWeaponAvailable(WeaponDefinition weapon)
         {
             if (weapon == null) return false;
@@ -45,5 +56,12 @@ namespace ProjectSun.FPS.Weapons
 
         public bool IsTacticalEquipmentAvailable(TacticalEquipmentDefinition equipment)
             => equipment != null && tacticalEquipment.Contains(equipment);
+
+        private static void AddWeapons(List<WeaponDefinition> destination, IEnumerable<WeaponDefinition> source)
+        {
+            if (source == null) return;
+            foreach (WeaponDefinition weapon in source)
+                if (weapon != null && !destination.Contains(weapon)) destination.Add(weapon);
+        }
     }
 }

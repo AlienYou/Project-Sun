@@ -6,6 +6,9 @@ namespace ProjectSun.FPS.Weapons
 {
     public enum AttachmentSlot { Optic, Muzzle, Barrel, Magazine, Stock }
 
+    /// <summary>Whether a weapon exposes a right-click aiming state in both gameplay and presentation.</summary>
+    public enum WeaponAimCapability { SupportsAds, HipFireOnly }
+
     [Serializable]
     public struct WeaponStats
     {
@@ -23,6 +26,8 @@ namespace ProjectSun.FPS.Weapons
             hipSpread = 1.45f, aimSpread = 0.32f, range = 120f
         };
     }
+
+    public enum WeaponInventorySlot { Primary, Secondary }
 
     [Serializable]
     public sealed class WeaponLoadout

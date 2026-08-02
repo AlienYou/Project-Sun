@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8bd57212d8454cb7a932bf084fed45aa, type: 3}
-  m_Name: WPP_AR01
+  m_Name: WPP_HG3
   m_EditorClassIdentifier: 
-  defaultAdsProfile: {fileID: 11400000, guid: 1d06ae15d836f0448a9a8cf201d50e1d, type: 2}
-  hipCameraSpacePositionOffset: {x: 0, y: 0, z: 0}
+  defaultAdsProfile: {fileID: 11400000, guid: 6ee1b65a70384742bec11df55ad2b2e8, type: 2}
+  hipCameraSpacePositionOffset: {x: 0.02, y: -0.035, z: 0.32}
   hipCameraSpaceRotationOffset: {x: 0, y: 0, z: 0}
-  viewKickMultiplier: 1
+  viewKickMultiplier: 0.72

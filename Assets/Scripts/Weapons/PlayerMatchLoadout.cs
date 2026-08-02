@@ -12,7 +12,7 @@ namespace ProjectSun.FPS.Weapons
     public sealed class PlayerMatchLoadout : MonoBehaviour
     {
         [SerializeField] private WeaponLoadout primary = new WeaponLoadout();
-        [SerializeField] private WeaponDefinition secondaryWeapon;
+        [SerializeField] private WeaponLoadout secondary = new WeaponLoadout();
         [SerializeField] private TacticalEquipmentDefinition tacticalEquipment;
 
         private HitscanWeapon activePrimaryWeapon;
@@ -20,8 +20,9 @@ namespace ProjectSun.FPS.Weapons
         private bool editingEnabled = true;
 
         public WeaponLoadout Primary => primary;
+        public WeaponLoadout Secondary => secondary;
         public WeaponDefinition PrimaryWeapon => primary.Weapon;
-        public WeaponDefinition SecondaryWeapon => secondaryWeapon;
+        public WeaponDefinition SecondaryWeapon => secondary.Weapon;
         public TacticalEquipmentDefinition TacticalEquipment => tacticalEquipment;
         public bool EditingEnabled => editingEnabled;
 
@@ -41,6 +42,13 @@ namespace ProjectSun.FPS.Weapons
             {
                 primary.SetWeapon(catalog.DefaultPrimaryWeapon);
                 primary.ClearAttachments();
+            }
+            if (secondary.Weapon == null && catalog != null)
+                secondary.SetWeapon(catalog.DefaultSecondaryWeapon);
+            if (catalog != null && secondary.Weapon != null && !catalog.IsSecondaryWeaponAvailable(secondary.Weapon))
+            {
+                secondary.SetWeapon(catalog.DefaultSecondaryWeapon);
+                secondary.ClearAttachments();
             }
 
             ApplyPrimary();
@@ -63,7 +71,9 @@ namespace ProjectSun.FPS.Weapons
         public bool TrySelectSecondary(WeaponDefinition definition)
         {
             if (!editingEnabled || catalog == null || !catalog.IsSecondaryWeaponAvailable(definition)) return false;
-            secondaryWeapon = definition;
+            if (secondary.Weapon == definition) return true;
+            secondary.SetWeapon(definition);
+            secondary.ClearAttachments();
             Changed?.Invoke();
             return true;
         }

@@ -118,10 +118,12 @@ namespace ProjectSun.FPS.Editor
 
         private static Transform CreateAimAnchor(Transform scopeSocket)
         {
-            Transform existing = FindDescendant(scopeSocket, "Aim Anchor");
+            Transform existing = FindDescendant(scopeSocket, "AimAnchor_AR4");
             if (existing != null) Object.DestroyImmediate(existing.gameObject);
+            Transform legacy = FindDescendant(scopeSocket, "Aim Anchor");
+            if (legacy != null) Object.DestroyImmediate(legacy.gameObject);
 
-            GameObject anchor = new GameObject("Aim Anchor");
+            GameObject anchor = new GameObject("AimAnchor_AR4");
             anchor.transform.SetParent(scopeSocket, false);
             anchor.transform.localPosition = new Vector3(0f, 0.015f, 0.045f);
             anchor.transform.localRotation = Quaternion.identity;

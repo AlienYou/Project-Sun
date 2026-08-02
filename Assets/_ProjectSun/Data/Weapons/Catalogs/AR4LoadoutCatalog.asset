@@ -15,7 +15,8 @@ MonoBehaviour:
   defaultWeapon: {fileID: 11400000, guid: 67abb993db0b8044b941d74fe5a3749b, type: 2}
   primaryWeapons:
   - {fileID: 11400000, guid: 67abb993db0b8044b941d74fe5a3749b, type: 2}
-  secondaryWeapons: []
+  secondaryWeapons:
+  - {fileID: 11400000, guid: 2c6f53594cb94612aca1959b0dc3ba23, type: 2}
   tacticalEquipment: []
   attachments:
   - {fileID: 11400000, guid: 0bf13dd4beafcd048bbbf07c828e9020, type: 2}

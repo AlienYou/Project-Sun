@@ -13,6 +13,7 @@ namespace ProjectSun.FPS.Editor
     {
         private const string DataRoot = "Assets/_ProjectSun/Data/Weapons";
         private const string DefinitionPath = DataRoot + "/Definitions/AR4Carbine.asset";
+        private const string SidearmDefinitionPath = DataRoot + "/Definitions/HG3Sidearm.asset";
         private const string CatalogPath = DataRoot + "/Catalogs/AR4LoadoutCatalog.asset";
         private const string ScenePath = "Assets/_ProjectSun/Scenes/CombatSlice.unity";
 
@@ -42,6 +43,23 @@ namespace ProjectSun.FPS.Editor
                 weapon.baseStats = WeaponStats.Carbine;
                 AssetDatabase.CreateAsset(weapon, DefinitionPath);
             }
+            weapon.automatic = true;
+            weapon.aimCapability = WeaponAimCapability.SupportsAds;
+
+            WeaponDefinition sidearm = AssetDatabase.LoadAssetAtPath<WeaponDefinition>(SidearmDefinitionPath);
+            if (sidearm == null)
+            {
+                sidearm = ScriptableObject.CreateInstance<WeaponDefinition>();
+                sidearm.displayName = "HG-3 Sidearm";
+                sidearm.automatic = false;
+                sidearm.baseStats = new WeaponStats
+                {
+                    damage = 32f, roundsPerSecond = 6.5f, magazineSize = 15, reloadSeconds = 1.65f,
+                    hipSpread = 1.75f, aimSpread = 0.42f, range = 75f
+                };
+                AssetDatabase.CreateAsset(sidearm, SidearmDefinitionPath);
+            }
+            sidearm.aimCapability = WeaponAimCapability.SupportsAds;
 
             List<WeaponAttachment> attachments = new List<WeaponAttachment>
             {
@@ -64,6 +82,7 @@ namespace ProjectSun.FPS.Editor
                 AssetDatabase.CreateAsset(catalog, CatalogPath);
             }
             catalog.SetContents(weapon, attachments);
+            catalog.SetWeaponSlots(new[] { weapon }, new[] { sidearm });
             EditorUtility.SetDirty(catalog);
             return catalog;
         }

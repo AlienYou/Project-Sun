@@ -17,6 +17,8 @@ namespace ProjectSun.FPS.Input
         Sprint,
         Crouch,
         Reload,
+        SelectPrimary,
+        SelectSecondary,
         Dash,
         Focus,
         Interact,
@@ -53,6 +55,8 @@ namespace ProjectSun.FPS.Input
         private InputAction sprint;
         private InputAction crouch;
         private InputAction reload;
+        private InputAction selectPrimary;
+        private InputAction selectSecondary;
         private InputAction dash;
         private InputAction focus;
         private InputAction interact;
@@ -173,6 +177,8 @@ namespace ProjectSun.FPS.Input
             sprint = gameplayMap.AddAction("Sprint", InputActionType.Button, "<Keyboard>/leftShift");
             crouch = gameplayMap.AddAction("Crouch", InputActionType.Button, "<Keyboard>/c");
             reload = gameplayMap.AddAction("Reload", InputActionType.Button, "<Keyboard>/r");
+            selectPrimary = gameplayMap.AddAction("Select Primary", InputActionType.Button, "<Keyboard>/1");
+            selectSecondary = gameplayMap.AddAction("Select Secondary", InputActionType.Button, "<Keyboard>/2");
             dash = gameplayMap.AddAction("Dash", InputActionType.Button, "<Keyboard>/q");
             focus = gameplayMap.AddAction("Focus", InputActionType.Button, "<Keyboard>/e");
             interact = gameplayMap.AddAction("Interact", InputActionType.Button, "<Keyboard>/f");
@@ -217,6 +223,8 @@ namespace ProjectSun.FPS.Input
                 case FpsBinding.Sprint: return sprint;
                 case FpsBinding.Crouch: return crouch;
                 case FpsBinding.Reload: return reload;
+                case FpsBinding.SelectPrimary: return selectPrimary;
+                case FpsBinding.SelectSecondary: return selectSecondary;
                 case FpsBinding.Dash: return dash;
                 case FpsBinding.Focus: return focus;
                 case FpsBinding.Interact: return interact;

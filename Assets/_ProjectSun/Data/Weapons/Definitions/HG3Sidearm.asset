@@ -10,15 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bba3a5bf0c37afb419534cbb1128b3b7, type: 3}
-  m_Name: AR4Carbine
+  m_Name: HG3Sidearm
   m_EditorClassIdentifier: 
-  displayName: AR-4 Carbine
-  automatic: 1
+  displayName: HG-3 Sidearm
+  automatic: 0
   baseStats:
-    damage: 34
-    roundsPerSecond: 10
-    magazineSize: 30
-    reloadSeconds: 2.15
-    hipSpread: 1.45
-    aimSpread: 0.32
-    range: 120
+    damage: 32
+    roundsPerSecond: 6.5
+    magazineSize: 15
+    reloadSeconds: 1.65
+    hipSpread: 1.75
+    aimSpread: 0.42
+    range: 75

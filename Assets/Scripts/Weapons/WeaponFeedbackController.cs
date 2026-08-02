@@ -62,6 +62,11 @@ namespace ProjectSun.FPS.Weapons
             input = player != null ? player.Input : null;
             viewCamera = camera;
             weaponVisual = visual;
+            if (muzzle != muzzleTransform && muzzleLight != null)
+            {
+                Destroy(muzzleLight.gameObject);
+                muzzleLight = null;
+            }
             muzzle = muzzleTransform;
             aimAnchor = weaponAimAnchor;
             adsProfile = weaponAdsProfile;
@@ -81,6 +86,21 @@ namespace ProjectSun.FPS.Weapons
             if (viewCamera != null)
                 viewCamera.fieldOfView = input != null ? input.FieldOfView : 78f;
             EnsureMuzzleLight();
+        }
+
+        /// <summary>Returns the shared first-person rig to its last known hip pose before a weapon visual changes.</summary>
+        public void SnapToHipPose()
+        {
+            aimAmount = 0f;
+            visualKick = 0f;
+            obstructionAmount = 0f;
+            if (weaponVisual != null)
+            {
+                weaponVisual.localPosition = hipPosition;
+                weaponVisual.localRotation = hipRotation;
+            }
+            if (viewCamera != null)
+                viewCamera.fieldOfView = input != null ? input.FieldOfView : 78f;
         }
 
         private void OnDestroy()

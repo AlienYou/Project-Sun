@@ -17,6 +17,7 @@ namespace ProjectSun.FPS.Presentation
         private bool wasReloading;
 
         public bool HasViewmodelRig => rig != null;
+        public LowPolyShooterViewmodelRig Rig => rig;
         public Transform Muzzle => rig != null ? rig.Muzzle : null;
         public Transform AimAnchor => rig != null ? rig.AimAnchor : null;
         public Transform VisualRoot => rig != null ? rig.transform : null;

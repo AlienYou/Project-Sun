@@ -290,6 +290,8 @@ namespace ProjectSun.FPS.Rounds
 
         private void ResetCombatants()
         {
+            if (playerInstaller != null && playerInstaller.WeaponInventory != null)
+                playerInstaller.WeaponInventory.ResetForRound();
             if (playerRespawn != null)
             {
                 playerRespawn.SetRoundRespawnsEnabled(true);

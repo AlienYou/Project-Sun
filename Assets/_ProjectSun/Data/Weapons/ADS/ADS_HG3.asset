@@ -10,15 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d3a691b46fcd4d0cae6f5dfe011e99a2, type: 3}
-  m_Name: ADS_AR01
+  m_Name: ADS_HG3
   m_EditorClassIdentifier: 
-  sightDistance: 0.01
+  sightDistance: 0.18
   zeroDistance: 25
-  sightReferenceLocalOffset: {x: -0.00009923356, y: 0.079859436, z: 0.009501363}
-  cameraSpacePositionOffset: {x: 0, y: -0, z: 0}
-  cameraSpaceRotationOffset: {x: 5, y: 0, z: 0}
+  sightReferenceLocalOffset: {x: -0.0000012649832, y: -0.00025206176, z: 0.014058457}
+  cameraSpacePositionOffset: {x: 0, y: 0, z: 0}
+  cameraSpaceRotationOffset: {x: 7.37, y: 0, z: 0}
   visualSightPlacementReviewed: 0
-  hipCameraSpacePositionOffset: {x: 0, y: 0, z: 0.18}
+  hipCameraSpacePositionOffset: {x: 0.02, y: -0.035, z: 0.32}
   hipCameraSpaceRotationOffset: {x: 0, y: 0, z: 0}
-  transitionSpeed: 5
-  fovReduction: 6
+  transitionSpeed: 10
+  fovReduction: 8

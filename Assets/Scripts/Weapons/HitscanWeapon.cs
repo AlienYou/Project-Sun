@@ -22,6 +22,7 @@ namespace ProjectSun.FPS.Weapons
         private WeaponStats stats;
         private int ammoInMagazine;
         private bool reloading;
+        private int reloadRevision;
         private float nextFireTime;
         private float damageMultiplier = 1f;
         private float spreadMultiplier = 1f;
@@ -36,6 +37,7 @@ namespace ProjectSun.FPS.Weapons
         public bool IsAiming { get; private set; }
         public float ReloadProgress { get; private set; }
         public bool LoadoutEditingEnabled => loadoutEditingEnabled;
+        public bool GameplayInputEnabled => gameplayInputEnabled;
 
         public event Action<RaycastHit> HitConfirmed;
         public event Action Fired;
@@ -83,6 +85,9 @@ namespace ProjectSun.FPS.Weapons
         /// </summary>
         public void SetLoadoutEditingEnabled(bool enabled) => loadoutEditingEnabled = enabled;
 
+        /// <summary>Updates the ballistic origin after an inventory switch without rebuilding weapon state.</summary>
+        public void SetMuzzle(Transform muzzleTransform) => muzzle = muzzleTransform;
+
         private void Awake()
         {
             stats = loadout.BuildStats(fallbackStats);
@@ -94,11 +99,14 @@ namespace ProjectSun.FPS.Weapons
         {
             if (viewCamera == null || input == null || !gameplayInputEnabled || !input.GameplayEnabled) return;
 
-            IsAiming = input.IsHeld(FpsBinding.Aim) && !reloading;
+            IsAiming = SupportsAds() && input.IsHeld(FpsBinding.Aim) && !reloading;
             if (input.WasPressed(FpsBinding.Reload) && ammoInMagazine < stats.magazineSize)
                 StartReload();
 
-            if (input.IsHeld(FpsBinding.Fire) && Time.time >= nextFireTime)
+            bool fireRequested = loadout.Weapon == null || loadout.Weapon.automatic
+                ? input.IsHeld(FpsBinding.Fire)
+                : input.WasPressed(FpsBinding.Fire);
+            if (fireRequested && Time.time >= nextFireTime)
                 Fire();
         }
 
@@ -125,6 +133,24 @@ namespace ProjectSun.FPS.Weapons
             loadout.CopyFrom(configuredLoadout);
             RefreshLoadout();
             return true;
+        }
+
+        /// <summary>
+        /// Inventory-only state transition. It intentionally does not consult the pre-round edit lock:
+        /// selecting an already locked secondary during an active round must remain legal.
+        /// </summary>
+        public void ApplyRuntimeLoadout(WeaponLoadout configuredLoadout, int savedAmmoInMagazine)
+        {
+            if (configuredLoadout == null) return;
+            reloading = false;
+            reloadRevision++;
+            ReloadProgress = 0f;
+            IsAiming = false;
+            loadout.CopyFrom(configuredLoadout);
+            stats = loadout.BuildStats(fallbackStats);
+            ammoInMagazine = savedAmmoInMagazine < 0
+                ? stats.magazineSize
+                : Mathf.Clamp(savedAmmoInMagazine, 0, stats.magazineSize);
         }
 
         private void Fire()
@@ -217,20 +243,24 @@ namespace ProjectSun.FPS.Weapons
         private void StartReload()
         {
             if (!reloading && ammoInMagazine < stats.magazineSize)
-                StartCoroutine(ReloadRoutine());
+                StartCoroutine(ReloadRoutine(++reloadRevision));
         }
 
-        private System.Collections.IEnumerator ReloadRoutine()
+        private bool SupportsAds() => loadout.Weapon == null || loadout.Weapon.SupportsAds;
+
+        private System.Collections.IEnumerator ReloadRoutine(int revision)
         {
             reloading = true;
             ReloadProgress = 0f;
             float elapsed = 0f;
             while (elapsed < stats.reloadSeconds)
             {
+                if (revision != reloadRevision) yield break;
                 elapsed += Time.deltaTime;
                 ReloadProgress = Mathf.Clamp01(elapsed / stats.reloadSeconds);
                 yield return null;
             }
+            if (revision != reloadRevision) yield break;
             ammoInMagazine = stats.magazineSize;
             ReloadProgress = 1f;
             reloading = false;
