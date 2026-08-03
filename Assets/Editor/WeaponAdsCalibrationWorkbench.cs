@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using ProjectSun.FPS.Core;
 using ProjectSun.FPS.Presentation;
 using ProjectSun.FPS.Weapons;
@@ -23,9 +24,11 @@ namespace ProjectSun.FPS.Editor
         [SerializeField] private Vector2 scrollPosition;
         [SerializeField] private bool freezeAnimationForCalibration;
         [SerializeField, Min(0.0005f)] private float visualNudgeStep = 0.002f;
+        [SerializeField, Range(0.005f, 0.08f)] private float viewmodelSafetyMargin = 0.015f;
         [SerializeField] private bool showAdvancedSettings;
         [SerializeField] private bool showSightReferenceMarker = true;
         [SerializeField, Range(0.002f, 0.03f)] private float sightReferenceMarkerRadius = 0.008f;
+        [SerializeField] private bool showClipProbeGuides = true;
 
         private LowPolyShooterViewmodelRig previewRig;
         private WeaponInventoryController inventory;
@@ -72,6 +75,22 @@ namespace ProjectSun.FPS.Editor
         private Vector3 adsPreviewHipPosition;
         private Quaternion adsPreviewHipRotation;
         private readonly Light[] cameraPreviewLights = new Light[2];
+        private readonly List<ClipProbeMeasurement> hipClipProbeMeasurements = new List<ClipProbeMeasurement>();
+        private readonly List<ClipProbeMeasurement> adsClipProbeMeasurements = new List<ClipProbeMeasurement>();
+
+        private readonly struct ClipProbeMeasurement
+        {
+            public readonly ViewmodelClipProbe Probe;
+            public readonly float Clearance;
+            public readonly bool IsInFrontOfCamera;
+
+            public ClipProbeMeasurement(ViewmodelClipProbe probe, float clearance, bool isInFrontOfCamera)
+            {
+                Probe = probe;
+                Clearance = clearance;
+                IsInFrontOfCamera = isInFrontOfCamera;
+            }
+        }
 
         [MenuItem("Project Sun/Tools/Weapon Presentation Workbench", priority = 40)]
         [MenuItem("Project Sun/Tools/ADS Calibration Workbench", priority = 41)]
@@ -312,9 +331,11 @@ namespace ProjectSun.FPS.Editor
             EditorGUILayout.LabelField("在 ADS 或并排视图中，让真实机瞄中心对准黄色空心十字。方向按钮修改当前武器的“机瞄参考修正”；不会影响其他武器。",
                 EditorStyles.wordWrappedMiniLabel);
             visualNudgeStep = EditorGUILayout.Slider("每次微调距离", visualNudgeStep, 0.0005f, 0.01f);
+            viewmodelSafetyMargin = EditorGUILayout.Slider("Clip Probe 安全余量", viewmodelSafetyMargin, 0.005f, 0.08f);
             showSightReferenceMarker = EditorGUILayout.Toggle("显示黄色机瞄参考", showSightReferenceMarker);
             if (showSightReferenceMarker)
                 sightReferenceMarkerRadius = EditorGUILayout.Slider("参考标记大小", sightReferenceMarkerRadius, 0.002f, 0.03f);
+            showClipProbeGuides = EditorGUILayout.Toggle("在 Scene 显示 Clip Probes", showClipProbeGuides);
 
             using (new EditorGUILayout.HorizontalScope())
             {
@@ -356,6 +377,7 @@ namespace ProjectSun.FPS.Editor
                 EditorGUILayout.HelpBox("当前武器为仅腰射配置：无需机瞄对齐、ADS Profile 或 Aim Anchor。", MessageType.Info);
                 return;
             }
+            if (previewActive) DrawClipProbeValidationStatus();
             if (!previewActive || !CanPreview() || previewMode == PreviewMode.Hip) return;
             if (!TryMeasureAlignment(out float screenErrorPixels))
             {
@@ -372,6 +394,56 @@ namespace ProjectSun.FPS.Editor
             EditorGUILayout.HelpBox(result + $"\n1. 机瞄参考 → 相机中心：{screenState}，误差 {screenErrorPixels:0.00}px（阈值 {ScreenTolerancePixels:0.00}px）" +
                 $"\n2. 视觉机瞄位置：{visualState}" +
                 $"\n3. 游戏命中路径：锁定相机准心，归零距离 {profile.ZeroDistance:0.0}m。", type);
+        }
+
+        private void DrawClipProbeValidationStatus()
+        {
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField("第一人称近裁剪契约", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(
+                "只验证武器与已激活配件上人工布置的 Clip Probe；完整渲染网格、枪托和动画辅助几何不参与判定。",
+                EditorStyles.wordWrappedMiniLabel);
+
+            bool hasHipProbes = TryMeasureClipProbes(PreviewMode.Hip, hipClipProbeMeasurements);
+            bool hasAdsProbes = HasAdsPreview && TryMeasureClipProbes(PreviewMode.Ads, adsClipProbeMeasurements);
+            if (!hasHipProbes && !hasAdsProbes)
+            {
+                EditorGUILayout.HelpBox(
+                    "当前武器尚未定义 Clip Probe，因此无法给出近裁剪通过结论。运行 Project Sun/Ensure Per-Weapon Viewmodel Clip Probes 创建基础契约；新武器或瞄具应在其预制体上自行添加关键可见表面的 ViewmodelClipProbe。",
+                    MessageType.Warning);
+                return;
+            }
+
+            if (hasHipProbes) DrawClipProbePoseStatus("腰射", hipClipProbeMeasurements);
+            if (hasAdsProbes) DrawClipProbePoseStatus("右键 ADS", adsClipProbeMeasurements);
+        }
+
+        private void DrawClipProbePoseStatus(string poseName, List<ClipProbeMeasurement> measurements)
+        {
+            int failedCount = 0;
+            string failures = string.Empty;
+            for (int index = 0; index < measurements.Count; index++)
+            {
+                ClipProbeMeasurement measurement = measurements[index];
+                bool passed = measurement.IsInFrontOfCamera && measurement.Clearance >= RequiredViewmodelClearance;
+                if (passed) continue;
+
+                failedCount++;
+                if (failedCount > 3) continue;
+                string value = measurement.IsInFrontOfCamera
+                    ? $"{measurement.Clearance * 1000f:0.0}mm"
+                    : "位于相机后方";
+                failures += $"\n- {measurement.Probe.ValidationLabel}: {value}";
+            }
+
+            bool safe = failedCount == 0;
+            string status = safe ? "通过" : "需要处理";
+            string detail = safe
+                ? $"全部 {measurements.Count} 个探针均满足 {RequiredViewmodelClearance * 1000f:0.0}mm 安全下限。"
+                : $"{failedCount}/{measurements.Count} 个探针未通过：{failures}" +
+                  (failedCount > 3 ? "\n- 其余失败探针已省略。" : string.Empty);
+            EditorGUILayout.HelpBox($"{poseName} Clip Probe：{status}\n{detail}",
+                safe ? MessageType.Info : MessageType.Error);
         }
 
         private void StartPreview()
@@ -846,7 +918,9 @@ namespace ProjectSun.FPS.Editor
 
         private void DrawSceneGuides(SceneView sceneView)
         {
-            if (!previewActive || !CanPreview() || previewMode == PreviewMode.Hip) return;
+            if (!previewActive || !CanPreview()) return;
+            if (showClipProbeGuides) DrawClipProbeGuides(previewRig, previewCamera);
+            if (previewMode == PreviewMode.Hip || profile == null) return;
             Vector3 cameraPosition = previewCamera.transform.position;
             Vector3 aimEnd = cameraPosition + previewCamera.transform.forward * 3f;
             Handles.color = new Color(0.2f, 0.8f, 1f, 0.9f);
@@ -880,6 +954,22 @@ namespace ProjectSun.FPS.Editor
             Handles.Label(previewRig.Muzzle.position, " MUZZLE ZERO PATH");
         }
 
+        private void DrawClipProbeGuides(LowPolyShooterViewmodelRig rig, Camera camera)
+        {
+            if (rig == null || camera == null) return;
+            Transform weaponVisual = rig.WeaponAnimator != null ? rig.WeaponAnimator.transform : rig.transform;
+            foreach (ViewmodelClipProbe probe in weaponVisual.GetComponentsInChildren<ViewmodelClipProbe>(true))
+            {
+                if (probe == null || !probe.ParticipatesInValidation || !probe.gameObject.activeInHierarchy) continue;
+                float clearance = camera.transform.InverseTransformPoint(probe.transform.position).z - probe.SurfaceRadius;
+                bool safe = clearance >= RequiredViewmodelClearance;
+                Handles.color = safe ? new Color(0.3f, 1f, 0.45f, 0.9f) : new Color(1f, 0.28f, 0.2f, 0.95f);
+                Handles.DrawWireDisc(probe.transform.position, camera.transform.forward, probe.SurfaceRadius);
+                Handles.Label(probe.transform.position + camera.transform.up * (probe.SurfaceRadius + 0.008f),
+                    $" CLIP · {probe.ValidationLabel} · {clearance * 1000f:0.0}mm");
+            }
+        }
+
         private bool TryMeasureAlignment(out float screenErrorPixels)
         {
             screenErrorPixels = float.PositiveInfinity;
@@ -909,6 +999,30 @@ namespace ProjectSun.FPS.Editor
             serializedProfile.ApplyModifiedProperties();
             EditorUtility.SetDirty(profile);
             TickPreview();
+        }
+
+        private float RequiredViewmodelClearance => ViewmodelCameraRenderer.NearClipPlane + viewmodelSafetyMargin;
+
+        private bool TryMeasureClipProbes(PreviewMode pose, List<ClipProbeMeasurement> measurements)
+        {
+            measurements.Clear();
+            if (!previewActive) return false;
+
+            LowPolyShooterViewmodelRig measuredRig = pose == PreviewMode.Hip ? cameraPreviewRig : adsPreviewRig;
+            Camera measuredCamera = pose == PreviewMode.Hip ? cameraPreviewCamera : adsPreviewCamera;
+            if (measuredRig == null || measuredCamera == null) return false;
+
+            Transform weaponVisual = measuredRig.WeaponAnimator != null
+                ? measuredRig.WeaponAnimator.transform
+                : measuredRig.transform;
+            foreach (ViewmodelClipProbe probe in weaponVisual.GetComponentsInChildren<ViewmodelClipProbe>(true))
+            {
+                if (probe == null || !probe.ParticipatesInValidation || !probe.gameObject.activeInHierarchy) continue;
+                float centreDepth = measuredCamera.transform.InverseTransformPoint(probe.transform.position).z;
+                float clearance = centreDepth - probe.SurfaceRadius;
+                measurements.Add(new ClipProbeMeasurement(probe, clearance, centreDepth > 0f));
+            }
+            return measurements.Count > 0;
         }
 
         private void CentreAdsMicroOffset()

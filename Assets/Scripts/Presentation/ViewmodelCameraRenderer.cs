@@ -14,6 +14,7 @@ namespace ProjectSun.FPS.Presentation
         private const string ViewmodelCameraName = "Viewmodel Camera";
         private const float ViewmodelFieldOfViewOffset = 16f;
         private const float MinimumViewmodelFieldOfView = 94f;
+        public const float NearClipPlane = 0.01f;
         private Camera worldCamera;
         private Camera viewmodelCamera;
         private UniversalAdditionalCameraData worldCameraData;
@@ -51,7 +52,7 @@ namespace ProjectSun.FPS.Presentation
         {
             if (worldCamera == null || viewmodelCamera == null) return;
             viewmodelCamera.fieldOfView = CalculatePresentationFieldOfView(worldCamera.fieldOfView);
-            viewmodelCamera.nearClipPlane = 0.01f;
+            viewmodelCamera.nearClipPlane = NearClipPlane;
             viewmodelCamera.farClipPlane = 10f;
             viewmodelCamera.rect = worldCamera.rect;
             viewmodelCamera.aspect = worldCamera.aspect;
@@ -73,7 +74,7 @@ namespace ProjectSun.FPS.Presentation
             viewmodelCameraData = cameraObject.GetComponent<UniversalAdditionalCameraData>();
             viewmodelCamera.clearFlags = CameraClearFlags.Depth;
             viewmodelCamera.cullingMask = 1 << CombatLayers.ViewmodelLayer;
-            viewmodelCamera.nearClipPlane = 0.01f;
+            viewmodelCamera.nearClipPlane = NearClipPlane;
             viewmodelCamera.farClipPlane = 10f;
             viewmodelCamera.depth = worldCamera.depth + 1f;
             viewmodelCamera.useOcclusionCulling = false;
