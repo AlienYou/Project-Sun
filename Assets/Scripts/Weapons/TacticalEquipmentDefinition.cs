@@ -16,5 +16,13 @@ namespace ProjectSun.FPS.Weapons
         public TacticalEquipmentType type = TacticalEquipmentType.Sensor;
         [Min(0f)] public float cooldownSeconds = 20f;
         [Min(1)] public int maxCharges = 1;
+
+        [Header("Deployable Parameters")]
+        [Min(0.5f)] public float deployRange = 4.5f;
+        [Min(0f)] public float armingSeconds = 0.8f;
+        [Min(0.1f)] public float triggerRadius = 2.6f;
+        [Min(0.1f)] public float blastRadius = 4f;
+        [Min(0f)] public float damage = 120f;
+        [Min(1f)] public float lifetimeSeconds = 90f;
     }
 }

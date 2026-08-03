@@ -14,7 +14,7 @@ namespace ProjectSun.FPS.UI
             FpsBinding.MoveForward, FpsBinding.MoveBackward, FpsBinding.MoveLeft, FpsBinding.MoveRight,
             FpsBinding.Fire, FpsBinding.Aim, FpsBinding.Jump, FpsBinding.Sprint, FpsBinding.Crouch,
             FpsBinding.Reload, FpsBinding.SelectPrimary, FpsBinding.SelectSecondary, FpsBinding.Dash, FpsBinding.Focus,
-            FpsBinding.Interact, FpsBinding.Loadout
+            FpsBinding.Interact, FpsBinding.UseTactical, FpsBinding.Loadout
         };
 
         private FpsPlayerController player;
@@ -120,6 +120,7 @@ namespace ProjectSun.FPS.UI
                 case FpsBinding.MoveRight: return "MOVE RIGHT";
                 case FpsBinding.SelectPrimary: return "SELECT PRIMARY";
                 case FpsBinding.SelectSecondary: return "SELECT SECONDARY";
+                case FpsBinding.UseTactical: return "USE TACTICAL";
                 default: return binding.ToString().ToUpperInvariant();
             }
         }

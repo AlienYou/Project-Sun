@@ -42,9 +42,12 @@ namespace ProjectSun.FPS.Bootstrap
                 playerInstaller.MatchLoadout.Configure(playerInstaller.Weapon, loadoutCatalog);
             if (playerInstaller.WeaponInventory != null)
                 playerInstaller.WeaponInventory.Configure(playerInstaller);
+            if (playerInstaller.TacticalEquipment != null)
+                playerInstaller.TacticalEquipment.ResetForRound();
 
             if (hud != null)
-                hud.Configure(playerInstaller.Weapon, playerInstaller.Abilities, playerInstaller.Health);
+                hud.Configure(playerInstaller.Weapon, playerInstaller.Abilities, playerInstaller.Health, null,
+                    playerInstaller.TacticalEquipment);
             if (customization != null)
                 customization.Configure(playerInstaller.Weapon, playerInstaller.Player, playerInstaller.Abilities, loadoutCatalog,
                     null, playerInstaller.MatchLoadout);

@@ -22,6 +22,7 @@ namespace ProjectSun.FPS.Input
         Dash,
         Focus,
         Interact,
+        UseTactical,
         Loadout,
         Settings,
         Menu,
@@ -60,6 +61,7 @@ namespace ProjectSun.FPS.Input
         private InputAction dash;
         private InputAction focus;
         private InputAction interact;
+        private InputAction useTactical;
         private InputAction loadout;
         private InputAction settings;
         private InputAction menu;
@@ -182,6 +184,7 @@ namespace ProjectSun.FPS.Input
             dash = gameplayMap.AddAction("Dash", InputActionType.Button, "<Keyboard>/q");
             focus = gameplayMap.AddAction("Focus", InputActionType.Button, "<Keyboard>/e");
             interact = gameplayMap.AddAction("Interact", InputActionType.Button, "<Keyboard>/f");
+            useTactical = gameplayMap.AddAction("Use Tactical", InputActionType.Button, "<Keyboard>/g");
             loadout = gameplayMap.AddAction("Loadout", InputActionType.Button, "<Keyboard>/tab");
             settings = gameplayMap.AddAction("Settings", InputActionType.Button, "<Keyboard>/o");
             menu = gameplayMap.AddAction("Menu", InputActionType.Button, "<Keyboard>/escape");
@@ -228,6 +231,7 @@ namespace ProjectSun.FPS.Input
                 case FpsBinding.Dash: return dash;
                 case FpsBinding.Focus: return focus;
                 case FpsBinding.Interact: return interact;
+                case FpsBinding.UseTactical: return useTactical;
                 case FpsBinding.Loadout: return loadout;
                 case FpsBinding.Settings: return settings;
                 case FpsBinding.Menu: return menu;

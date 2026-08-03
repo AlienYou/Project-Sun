@@ -14,6 +14,7 @@ namespace ProjectSun.FPS.Editor
         private const string DataRoot = "Assets/_ProjectSun/Data/Weapons";
         private const string DefinitionPath = DataRoot + "/Definitions/AR4Carbine.asset";
         private const string SidearmDefinitionPath = DataRoot + "/Definitions/HG3Sidearm.asset";
+        private const string SensorMinePath = DataRoot + "/Tactical/S1SensorMine.asset";
         private const string CatalogPath = DataRoot + "/Catalogs/AR4LoadoutCatalog.asset";
         private const string ScenePath = "Assets/_ProjectSun/Scenes/CombatSlice.unity";
 
@@ -33,6 +34,7 @@ namespace ProjectSun.FPS.Editor
             EnsureFolder(DataRoot);
             EnsureFolder(DataRoot + "/Definitions");
             EnsureFolder(DataRoot + "/Attachments");
+            EnsureFolder(DataRoot + "/Tactical");
             EnsureFolder(DataRoot + "/Catalogs");
 
             WeaponDefinition weapon = AssetDatabase.LoadAssetAtPath<WeaponDefinition>(DefinitionPath);
@@ -60,6 +62,8 @@ namespace ProjectSun.FPS.Editor
                 AssetDatabase.CreateAsset(sidearm, SidearmDefinitionPath);
             }
             sidearm.aimCapability = WeaponAimCapability.SupportsAds;
+
+            TacticalEquipmentDefinition sensorMine = CreateOrGetSensorMine();
 
             List<WeaponAttachment> attachments = new List<WeaponAttachment>
             {
@@ -90,8 +94,33 @@ namespace ProjectSun.FPS.Editor
             }
             catalog.SetContents(weapon, attachments);
             catalog.SetWeaponSlots(new[] { weapon }, new[] { sidearm });
+            catalog.SetTacticalEquipment(new[] { sensorMine });
             EditorUtility.SetDirty(catalog);
             return catalog;
+        }
+
+        private static TacticalEquipmentDefinition CreateOrGetSensorMine()
+        {
+            TacticalEquipmentDefinition sensorMine = AssetDatabase.LoadAssetAtPath<TacticalEquipmentDefinition>(SensorMinePath);
+            if (sensorMine == null)
+            {
+                sensorMine = ScriptableObject.CreateInstance<TacticalEquipmentDefinition>();
+                AssetDatabase.CreateAsset(sensorMine, SensorMinePath);
+            }
+
+            sensorMine.displayName = "S-1 SENSOR MINE";
+            sensorMine.description = "Deploys an armed proximity mine that detonates when an enemy enters its trigger radius.";
+            sensorMine.type = TacticalEquipmentType.Deployable;
+            sensorMine.cooldownSeconds = 12f;
+            sensorMine.maxCharges = 1;
+            sensorMine.deployRange = 4.5f;
+            sensorMine.armingSeconds = 0.8f;
+            sensorMine.triggerRadius = 2.6f;
+            sensorMine.blastRadius = 4f;
+            sensorMine.damage = 120f;
+            sensorMine.lifetimeSeconds = 90f;
+            EditorUtility.SetDirty(sensorMine);
+            return sensorMine;
         }
 
         private static WeaponAttachment CreateAttachment(string assetName, AttachmentSlot slot, string displayName, float damage = 1f,

@@ -292,6 +292,8 @@ namespace ProjectSun.FPS.Rounds
         {
             if (playerInstaller != null && playerInstaller.WeaponInventory != null)
                 playerInstaller.WeaponInventory.ResetForRound();
+            if (playerInstaller != null && playerInstaller.TacticalEquipment != null)
+                playerInstaller.TacticalEquipment.ResetForRound();
             if (playerRespawn != null)
             {
                 playerRespawn.SetRoundRespawnsEnabled(true);
@@ -312,6 +314,7 @@ namespace ProjectSun.FPS.Rounds
             if (playerInstaller.Player != null) playerInstaller.Player.SetGameplayInputEnabled(enabled);
             if (playerInstaller.Weapon != null) playerInstaller.Weapon.SetGameplayInputEnabled(enabled);
             if (playerInstaller.Abilities != null) playerInstaller.Abilities.SetGameplayInputEnabled(enabled);
+            if (playerInstaller.TacticalEquipment != null) playerInstaller.TacticalEquipment.SetGameplayInputEnabled(enabled);
         }
 
         private void SetPlayerLoadoutEditingEnabled(bool enabled)

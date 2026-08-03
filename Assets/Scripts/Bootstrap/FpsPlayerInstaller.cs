@@ -22,6 +22,7 @@ namespace ProjectSun.FPS.Bootstrap
         private bool initialized;
         private PlayerMatchLoadout matchLoadout;
         private WeaponInventoryController weaponInventory;
+        private FpsTacticalEquipmentController tacticalEquipment;
 
         public FpsPlayerController Player => player;
         public Health Health => health;
@@ -29,6 +30,7 @@ namespace ProjectSun.FPS.Bootstrap
         public FpsAbilityController Abilities => abilities;
         public PlayerMatchLoadout MatchLoadout => matchLoadout;
         public WeaponInventoryController WeaponInventory => weaponInventory;
+        public FpsTacticalEquipmentController TacticalEquipment => tacticalEquipment;
         public Camera PlayerCamera => playerCamera;
 
         public void SetReferences(FpsPlayerController controller, Health playerHealth, HitscanWeapon hitscanWeapon,
@@ -55,6 +57,9 @@ namespace ProjectSun.FPS.Bootstrap
             weaponInventory = GetComponent<WeaponInventoryController>();
             if (weaponInventory == null)
                 weaponInventory = gameObject.AddComponent<WeaponInventoryController>();
+            tacticalEquipment = GetComponent<FpsTacticalEquipmentController>();
+            if (tacticalEquipment == null)
+                tacticalEquipment = gameObject.AddComponent<FpsTacticalEquipmentController>();
             player.Configure(playerCamera.transform, playerCamera);
             Transform configuredMuzzle = muzzle;
             Transform weaponVisual = muzzle != null ? muzzle.parent : null;
@@ -72,6 +77,7 @@ namespace ProjectSun.FPS.Bootstrap
             }
             weapon.Configure(playerCamera, configuredMuzzle);
             abilities.Configure(player, weapon);
+            tacticalEquipment.Configure(player, playerCamera, matchLoadout);
             ViewmodelCameraRenderer viewmodelRenderer = GetComponent<ViewmodelCameraRenderer>();
             if (viewmodelRenderer == null) viewmodelRenderer = gameObject.AddComponent<ViewmodelCameraRenderer>();
             viewmodelRenderer.Configure(playerCamera, weaponVisual);

@@ -45,6 +45,20 @@ namespace ProjectSun.FPS.Weapons
             defaultWeapon = DefaultPrimaryWeapon;
         }
 
+        /// <summary>
+        /// Replaces the equipment options offered by the loadout menu. Equipment definitions are
+        /// intentionally catalogued independently from weapons: a future grenade or sensor can be
+        /// added without changing the primary/secondary weapon contract.
+        /// </summary>
+        public void SetTacticalEquipment(IEnumerable<TacticalEquipmentDefinition> availableEquipment)
+        {
+            tacticalEquipment.Clear();
+            if (availableEquipment == null) return;
+            foreach (TacticalEquipmentDefinition equipment in availableEquipment)
+                if (equipment != null && !tacticalEquipment.Contains(equipment))
+                    tacticalEquipment.Add(equipment);
+        }
+
         public bool IsPrimaryWeaponAvailable(WeaponDefinition weapon)
         {
             if (weapon == null) return false;

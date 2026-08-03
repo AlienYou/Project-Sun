@@ -14,6 +14,7 @@ namespace ProjectSun.FPS.UI
         private FpsAbilityController abilities;
         private Health health;
         private RoundManager roundManager;
+        private FpsTacticalEquipmentController tacticalEquipment;
         private float hitMarkerUntil;
         private float damageWarningUntil;
         private string damageDirection = string.Empty;
@@ -22,7 +23,7 @@ namespace ProjectSun.FPS.UI
         private GUIStyle largeTextStyle;
 
         public void Configure(HitscanWeapon hitscanWeapon, FpsAbilityController abilityController, Health playerHealth,
-            RoundManager combatRoundManager = null)
+            RoundManager combatRoundManager = null, FpsTacticalEquipmentController playerTacticalEquipment = null)
         {
             if (weapon != null) weapon.HitConfirmed -= ShowHitMarker;
             if (health != null) health.Damaged -= ShowDamageWarning;
@@ -30,6 +31,7 @@ namespace ProjectSun.FPS.UI
             abilities = abilityController;
             health = playerHealth;
             roundManager = combatRoundManager;
+            tacticalEquipment = playerTacticalEquipment;
             if (weapon != null) weapon.HitConfirmed += ShowHitMarker;
             if (health != null) health.Damaged += ShowDamageWarning;
         }
@@ -66,9 +68,11 @@ namespace ProjectSun.FPS.UI
             }
             GUI.Label(new Rect(28, 50, 550, 24),
                 $"[Q] DASH {Cooldown(abilities.DashCooldownRemaining)}    [E] FOCUS {Cooldown(abilities.FocusCooldownRemaining, abilities.IsFocused)}", textStyle);
+            if (tacticalEquipment != null)
+                GUI.Label(new Rect(28, 126, 620, 24), $"[G] {tacticalEquipment.StatusLabel}", textStyle);
             GUI.Label(new Rect(28, 76, 840, 24), roundManager != null
-                ? "WASD move  SHIFT sprint  SPACE jump  C crouch  RMB aim  R reload  1/2 weapons  TAB loadout  O settings  F8 restart match"
-                : "WASD move  SHIFT sprint  SPACE jump  C crouch  RMB aim  R reload  1/2 weapons  F interact  TAB loadout  O settings", textStyle);
+                ? "WASD move  SHIFT sprint  SPACE jump  C crouch  RMB aim  R reload  G tactical  1/2 weapons  TAB loadout  O settings  F8 restart match"
+                : "WASD move  SHIFT sprint  SPACE jump  C crouch  RMB aim  R reload  G tactical  1/2 weapons  F interact  TAB loadout  O settings", textStyle);
 
             if (!hideCrosshairWhileAiming || !weapon.IsAiming)
                 DrawCrosshair(width, height);

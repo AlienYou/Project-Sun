@@ -244,6 +244,8 @@ namespace ProjectSun.FPS.UI
                 string state = choice == (matchLoadout != null ? matchLoadout.TacticalEquipment : null) ? "EQUIPPED" : "SELECT";
                 if (GUI.Button(new Rect(x, area.y + 44f, 190f, 32f), $"{choice.displayName}  //  {state}"))
                     matchLoadout.TrySelectTactical(choice);
+                GUI.Label(new Rect(x, area.y + 82f, 190f, 52f),
+                    $"[G] {choice.description}\n{choice.maxCharges} charge  //  {choice.cooldownSeconds:0}s cooldown", bodyStyle);
                 x += 198f;
             }
             GUI.enabled = previousGuiEnabled;
