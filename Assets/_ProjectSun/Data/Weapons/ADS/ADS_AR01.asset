@@ -14,10 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   sightDistance: 0.01
   zeroDistance: 25
-  sightReferenceLocalOffset: {x: -0.00009923356, y: 0.079859436, z: 0.009501363}
+  sightReferenceLocalOffset: {x: -0.0000050404797, y: 0.042027652, z: 0.00006664754}
   cameraSpacePositionOffset: {x: 0, y: -0, z: 0}
-  cameraSpaceRotationOffset: {x: 5, y: 0, z: 0}
-  visualSightPlacementReviewed: 0
+  cameraSpaceRotationOffset: {x: 5.19, y: 0, z: 0}
+  visualSightPlacementReviewed: 1
   hipCameraSpacePositionOffset: {x: 0, y: 0, z: 0.18}
   hipCameraSpaceRotationOffset: {x: 0, y: 0, z: 0}
   transitionSpeed: 5
