@@ -74,6 +74,13 @@ namespace ProjectSun.FPS.Editor
                 CreateAttachment("TacticalStock", AttachmentSlot.Stock, "TACTICAL STOCK", hipSpread: 0.88f, aimSpread: 0.78f),
                 CreateAttachment("LightStock", AttachmentSlot.Stock, "LIGHT STOCK", fireRate: 1.08f, hipSpread: 1.12f)
             };
+            // The currently authored parts are AR-4 components. Sidearm parts will be added as separate assets
+            // once they have their own viewmodel and presentation contracts.
+            foreach (WeaponAttachment attachment in attachments)
+            {
+                attachment.SetCompatibleWeapons(weapon);
+                EditorUtility.SetDirty(attachment);
+            }
 
             WeaponLoadoutCatalog catalog = AssetDatabase.LoadAssetAtPath<WeaponLoadoutCatalog>(CatalogPath);
             if (catalog == null)

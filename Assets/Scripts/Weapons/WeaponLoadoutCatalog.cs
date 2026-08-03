@@ -57,6 +57,13 @@ namespace ProjectSun.FPS.Weapons
         public bool IsTacticalEquipmentAvailable(TacticalEquipmentDefinition equipment)
             => equipment != null && tacticalEquipment.Contains(equipment);
 
+        /// <summary>
+        /// Catalog membership is checked separately from an attachment's weapon-family contract, so a future
+        /// optic or magazine can be shared by selected weapons without the loadout UI guessing compatibility.
+        /// </summary>
+        public bool IsAttachmentAvailable(WeaponDefinition weapon, WeaponAttachment attachment)
+            => weapon != null && attachment != null && attachments.Contains(attachment) && attachment.IsCompatibleWith(weapon);
+
         private static void AddWeapons(List<WeaponDefinition> destination, IEnumerable<WeaponDefinition> source)
         {
             if (source == null) return;

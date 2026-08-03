@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: WPP_AR01
   m_EditorClassIdentifier: 
   defaultAdsProfile: {fileID: 11400000, guid: 1d06ae15d836f0448a9a8cf201d50e1d, type: 2}
-  hipCameraSpacePositionOffset: {x: 0, y: -0, z: 0.01}
+  hipCameraSpacePositionOffset: {x: 0, y: -0.01, z: 0.01}
   hipCameraSpaceRotationOffset: {x: 0, y: 0, z: 0}
   viewKickMultiplier: 1

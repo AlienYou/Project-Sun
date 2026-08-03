@@ -23,6 +23,7 @@ namespace ProjectSun.FPS.UI
         private bool isOpen;
         private bool wasInPreparation;
         private LoadoutPage activePage = LoadoutPage.Weapons;
+        private WeaponInventorySlot attachmentTargetSlot = WeaponInventorySlot.Primary;
         private GUIStyle titleStyle;
         private GUIStyle bodyStyle;
 
@@ -79,10 +80,12 @@ namespace ProjectSun.FPS.UI
             float panelHeight = Mathf.Min(620f, Screen.height - 48f);
             Rect panel = new Rect((Screen.width - panelWidth) * 0.5f, (Screen.height - panelHeight) * 0.5f, panelWidth, panelHeight);
             GUI.Box(panel, GUIContent.none);
-            string weaponName = PrimaryLoadout.Weapon != null ? PrimaryLoadout.Weapon.displayName : "AR-4 CARBINE";
-            GUI.Label(new Rect(panel.x + 26f, panel.y + 20f, 700f, 34f), $"{weaponName.ToUpperInvariant()} // PRE-ROUND LOADOUT", titleStyle);
+            string primaryName = PrimaryLoadout.Weapon != null ? PrimaryLoadout.Weapon.displayName : "UNASSIGNED";
+            string secondaryName = SecondaryLoadout.Weapon != null ? SecondaryLoadout.Weapon.displayName : "UNASSIGNED";
+            string phase = roundManager != null ? $"PREP {roundManager.TimeRemaining:0.0}s" : "WEAPON LAB";
+            GUI.Label(new Rect(panel.x + 26f, panel.y + 20f, 700f, 34f), $"PRE-ROUND LOADOUT // {phase}", titleStyle);
             GUI.Label(new Rect(panel.x + 26f, panel.y + 55f, 760f, 24f),
-                "Pick one component per slot. Changes lock when the round begins. Press TAB to close.", bodyStyle);
+                $"PRIMARY  {primaryName.ToUpperInvariant()}   //   SECONDARY  {secondaryName.ToUpperInvariant()}   //   LOCKS WHEN ROUND GOES LIVE", bodyStyle);
 
             DrawPageTabs(panel);
             Rect content = new Rect(panel.x + 26f, panel.y + 128f, panel.width - 52f, panel.height - 192f);
@@ -123,7 +126,7 @@ namespace ProjectSun.FPS.UI
             DrawWeaponChoices("SECONDARY WEAPON", CatalogSecondaryWeapons, matchLoadout != null ? matchLoadout.SecondaryWeapon : null,
                 area.x, area.y + 150f, false);
             GUI.Label(new Rect(area.x, area.y + 263f, area.width, 52f),
-                "Primary is the equipped gameplay weapon. Secondary selection becomes usable when the pistol viewmodel, switching, and independent ammunition are integrated.", bodyStyle);
+                "Selections are stored in the match loadout. At round start the primary is equipped; press 1 / 2 during the round to switch between the configured weapons.", bodyStyle);
         }
 
         private void DrawWeaponChoices(string label, System.Collections.Generic.IReadOnlyList<WeaponDefinition> choices,
@@ -162,35 +165,61 @@ namespace ProjectSun.FPS.UI
 
         private void DrawAttachmentsPage(Rect area)
         {
+            GUI.Label(new Rect(area.x, area.y, area.width, 28f), "CONFIGURE ATTACHMENTS", titleStyle);
+            float selectorWidth = 170f;
+            bool previousGuiEnabled = GUI.enabled;
+            GUI.enabled = CanEditLoadout;
+            if (GUI.Button(new Rect(area.x, area.y + 35f, selectorWidth, 29f),
+                    attachmentTargetSlot == WeaponInventorySlot.Primary ? "PRIMARY // SELECTED" : "PRIMARY"))
+                attachmentTargetSlot = WeaponInventorySlot.Primary;
+            if (GUI.Button(new Rect(area.x + selectorWidth + 8f, area.y + 35f, selectorWidth, 29f),
+                    attachmentTargetSlot == WeaponInventorySlot.Secondary ? "SECONDARY // SELECTED" : "SECONDARY"))
+                attachmentTargetSlot = WeaponInventorySlot.Secondary;
+            GUI.enabled = previousGuiEnabled;
+
+            WeaponLoadout targetLoadout = AttachmentTargetLoadout;
+            WeaponDefinition targetWeapon = targetLoadout != null ? targetLoadout.Weapon : null;
+            if (targetWeapon == null)
+            {
+                GUI.Label(new Rect(area.x, area.y + 82f, area.width, 30f),
+                    "SELECT A WEAPON FOR THIS SLOT BEFORE CONFIGURING ATTACHMENTS.", bodyStyle);
+                return;
+            }
+
             float columnWidth = (area.width - 28f) * 0.5f;
             AttachmentSlot[] slots = { AttachmentSlot.Optic, AttachmentSlot.Muzzle, AttachmentSlot.Barrel, AttachmentSlot.Magazine, AttachmentSlot.Stock };
             for (int i = 0; i < slots.Length; i++)
-                DrawAttachmentSlot(slots[i], new Rect(area.x, area.y + i * 78f, columnWidth, 72f));
-            DrawStats(new Rect(area.x + columnWidth + 28f, area.y, columnWidth, 280f));
+                DrawAttachmentSlot(targetLoadout, targetWeapon, slots[i],
+                    new Rect(area.x, area.y + 82f + i * 64f, columnWidth, 59f));
+            DrawStats(targetLoadout, new Rect(area.x + columnWidth + 28f, area.y + 82f, columnWidth, 280f));
         }
 
-        private void DrawAttachmentSlot(AttachmentSlot slot, Rect area)
+        private void DrawAttachmentSlot(WeaponLoadout loadout, WeaponDefinition targetWeapon, AttachmentSlot slot, Rect area)
         {
-            WeaponAttachment equipped = PrimaryLoadout.GetEquipped(slot);
+            WeaponAttachment equipped = loadout.GetEquipped(slot);
             GUI.Label(new Rect(area.x, area.y, 145f, 23f), slot.ToString().ToUpperInvariant(), bodyStyle);
             GUI.Label(new Rect(area.x + 145f, area.y, area.width - 145f, 23f), equipped != null ? equipped.displayName : "STANDARD ISSUE", bodyStyle);
 
             bool previousGuiEnabled = GUI.enabled;
             GUI.enabled = CanEditLoadout;
             float x = area.x;
+            bool hasCompatibleOption = false;
             foreach (WeaponAttachment option in options)
             {
-                if (option.slot != slot) continue;
+                if (option.slot != slot || !IsAttachmentAvailable(targetWeapon, option)) continue;
+                hasCompatibleOption = true;
                 if (GUI.Button(new Rect(x, area.y + 29f, 132f, 30f), option.displayName))
                 {
-                    if (matchLoadout != null) matchLoadout.TryEquipPrimary(option);
+                    if (matchLoadout != null) matchLoadout.TryEquip(attachmentTargetSlot, option);
                     else weapon.TryEquip(option);
                 }
                 x += 140f;
             }
-            if (GUI.Button(new Rect(x, area.y + 29f, 105f, 30f), "REMOVE"))
+            if (!hasCompatibleOption)
+                GUI.Label(new Rect(x, area.y + 34f, 180f, 22f), "NO COMPATIBLE PART", bodyStyle);
+            else if (GUI.Button(new Rect(x, area.y + 29f, 105f, 30f), "REMOVE"))
             {
-                if (matchLoadout != null) matchLoadout.TryUnequipPrimary(slot);
+                if (matchLoadout != null) matchLoadout.TryUnequip(attachmentTargetSlot, slot);
                 else weapon.TryUnequip(slot);
             }
             GUI.enabled = previousGuiEnabled;
@@ -220,10 +249,10 @@ namespace ProjectSun.FPS.UI
             GUI.enabled = previousGuiEnabled;
         }
 
-        private void DrawStats(Rect area)
+        private void DrawStats(WeaponLoadout loadout, Rect area)
         {
-            WeaponStats stats = weapon.Stats;
-            GUI.Label(new Rect(area.x, area.y, area.width, 28f), "LIVE WEAPON STATISTICS", titleStyle);
+            WeaponStats stats = loadout != null ? loadout.BuildStats(WeaponStats.Carbine) : weapon.Stats;
+            GUI.Label(new Rect(area.x, area.y, area.width, 28f), "CONFIGURED WEAPON STATISTICS", titleStyle);
             GUI.Label(new Rect(area.x, area.y + 43f, area.width, 190f),
                 $"Damage      {stats.damage:0.0}\n" +
                 $"Fire rate   {stats.roundsPerSecond:0.0} rounds/s\n" +
@@ -249,6 +278,10 @@ namespace ProjectSun.FPS.UI
 
         private bool CanEditLoadout => roundManager == null || roundManager.CanEditLoadout;
         private WeaponLoadout PrimaryLoadout => matchLoadout != null ? matchLoadout.Primary : weapon.Loadout;
+        private WeaponLoadout SecondaryLoadout => matchLoadout != null ? matchLoadout.Secondary : new WeaponLoadout();
+        private WeaponLoadout AttachmentTargetLoadout => attachmentTargetSlot == WeaponInventorySlot.Primary
+            ? PrimaryLoadout
+            : SecondaryLoadout;
         private WeaponDefinition CurrentPrimaryWeapon => PrimaryLoadout.Weapon;
         private System.Collections.Generic.IReadOnlyList<WeaponDefinition> CatalogPrimaryWeapons
             => catalog != null ? catalog.PrimaryWeapons : System.Array.Empty<WeaponDefinition>();
@@ -256,6 +289,14 @@ namespace ProjectSun.FPS.UI
             => catalog != null ? catalog.SecondaryWeapons : System.Array.Empty<WeaponDefinition>();
         private System.Collections.Generic.IReadOnlyList<TacticalEquipmentDefinition> CatalogTacticalEquipment
             => catalog != null ? catalog.TacticalEquipment : System.Array.Empty<TacticalEquipmentDefinition>();
+
+        private bool IsAttachmentAvailable(WeaponDefinition weaponDefinition, WeaponAttachment attachment)
+        {
+            if (weaponDefinition == null || attachment == null) return false;
+            return catalog != null
+                ? catalog.IsAttachmentAvailable(weaponDefinition, attachment)
+                : attachment.IsCompatibleWith(weaponDefinition);
+        }
 
         private void CreateOptions()
         {

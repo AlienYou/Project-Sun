@@ -54,6 +54,12 @@ WeaponRoot_<WeaponId>
 
 新增瞄具时，应同时提供其视觉模型、必要的 ADS Profile 覆盖和自身 Clip Probe。不要通过修改步枪基础 Probe 来迁就某一件瞄具。
 
+## 配件兼容性与菜单
+
+`WeaponAttachment` 通过 `compatibleWeapons` 定义可安装的武器族。空列表表示该配件可被 Catalog 中的任意武器使用；武器专用配件必须显式列出允许的 `WeaponDefinition`。当前 Catalog 的十个步枪配件均限定为 AR-4，HG-3 在菜单中不会显示这些选项。
+
+Loadout Menu 在准备阶段允许分别选择主武器、副武器及各自的配件。主武器配件会立即更新准备阶段的数值；副武器配件存入副武器 Loadout，并在玩家按 `2` 切换到副武器时应用。对局开始后，RoundManager 会锁定所有选择。
+
 ## 提交要求
 
 一项武器表现变更必须同提交以下相关资产：

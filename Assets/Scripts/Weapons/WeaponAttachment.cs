@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace ProjectSun.FPS.Weapons
@@ -24,9 +25,29 @@ namespace ProjectSun.FPS.Weapons
         [SerializeField] private Vector3 hipCameraSpaceRotationOffset;
         [SerializeField, Range(0.1f, 2f)] private float viewKickMultiplier = 1f;
 
+        [Header("Compatibility")]
+        [Tooltip("Leave empty to allow every weapon exposed by the loadout catalog. Populate this list for weapon-family-specific attachments.")]
+        [SerializeField] private List<WeaponDefinition> compatibleWeapons = new List<WeaponDefinition>();
+
         public WeaponAdsProfile AdsProfileOverride => adsProfileOverride;
         public Vector3 HipCameraSpacePositionOffset => hipCameraSpacePositionOffset;
         public Vector3 HipCameraSpaceRotationOffset => hipCameraSpaceRotationOffset;
         public float ViewKickMultiplier => viewKickMultiplier;
+
+        public bool IsCompatibleWith(WeaponDefinition weapon)
+        {
+            if (weapon == null) return false;
+            return compatibleWeapons == null || compatibleWeapons.Count == 0 || compatibleWeapons.Contains(weapon);
+        }
+
+        /// <summary>Content-authoring helper used by the owned catalog generator.</summary>
+        public void SetCompatibleWeapons(params WeaponDefinition[] weapons)
+        {
+            if (compatibleWeapons == null) compatibleWeapons = new List<WeaponDefinition>();
+            compatibleWeapons.Clear();
+            if (weapons == null) return;
+            foreach (WeaponDefinition weapon in weapons)
+                if (weapon != null && !compatibleWeapons.Contains(weapon)) compatibleWeapons.Add(weapon);
+        }
     }
 }

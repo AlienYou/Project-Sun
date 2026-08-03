@@ -86,23 +86,46 @@ namespace ProjectSun.FPS.Weapons
             return true;
         }
 
-        public bool TryEquipPrimary(WeaponAttachment attachment)
+        public bool TryEquipPrimary(WeaponAttachment attachment) => TryEquip(WeaponInventorySlot.Primary, attachment);
+
+        public bool TryEquipSecondary(WeaponAttachment attachment) => TryEquip(WeaponInventorySlot.Secondary, attachment);
+
+        public bool TryUnequipPrimary(AttachmentSlot slot) => TryUnequip(WeaponInventorySlot.Primary, slot);
+
+        public bool TryUnequipSecondary(AttachmentSlot slot) => TryUnequip(WeaponInventorySlot.Secondary, slot);
+
+        /// <summary>
+        /// Stores an attachment in the requested loadout slot. Primary changes are reflected immediately in the
+        /// prepared weapon actor; secondary changes are applied when WeaponInventoryController selects that slot.
+        /// </summary>
+        public bool TryEquip(WeaponInventorySlot slot, WeaponAttachment attachment)
         {
-            if (!editingEnabled || !CanApplyPrimary || attachment == null) return false;
-            primary.Equip(attachment);
-            if (!ApplyPrimary()) return false;
+            WeaponLoadout target = GetLoadout(slot);
+            if (!editingEnabled || attachment == null || target == null || target.Weapon == null) return false;
+            if (slot == WeaponInventorySlot.Primary && !CanApplyPrimary) return false;
+            if (catalog != null && !catalog.IsAttachmentAvailable(target.Weapon, attachment)) return false;
+            if (catalog == null && !attachment.IsCompatibleWith(target.Weapon)) return false;
+
+            target.Equip(attachment);
+            if (slot == WeaponInventorySlot.Primary && !ApplyPrimary()) return false;
             Changed?.Invoke();
             return true;
         }
 
-        public bool TryUnequipPrimary(AttachmentSlot slot)
+        public bool TryUnequip(WeaponInventorySlot slot, AttachmentSlot attachmentSlot)
         {
-            if (!editingEnabled || !CanApplyPrimary) return false;
-            primary.Unequip(slot);
-            if (!ApplyPrimary()) return false;
+            WeaponLoadout target = GetLoadout(slot);
+            if (!editingEnabled || target == null) return false;
+            if (slot == WeaponInventorySlot.Primary && !CanApplyPrimary) return false;
+
+            target.Unequip(attachmentSlot);
+            if (slot == WeaponInventorySlot.Primary && !ApplyPrimary()) return false;
             Changed?.Invoke();
             return true;
         }
+
+        private WeaponLoadout GetLoadout(WeaponInventorySlot slot)
+            => slot == WeaponInventorySlot.Primary ? primary : secondary;
 
         private bool ApplyPrimary()
         {
