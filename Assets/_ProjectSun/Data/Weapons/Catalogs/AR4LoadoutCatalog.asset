@@ -19,6 +19,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 2c6f53594cb94612aca1959b0dc3ba23, type: 2}
   tacticalEquipment:
   - {fileID: 11400000, guid: 4a3d97d1e4a544acb8992a4def767b47, type: 2}
+  - {fileID: 11400000, guid: c8dc0053aa7b49a39ae6493311cfae53, type: 2}
   attachments:
   - {fileID: 11400000, guid: 0bf13dd4beafcd048bbbf07c828e9020, type: 2}
   - {fileID: 11400000, guid: 8f13106fba53e444a9ecac7d7e45ea9c, type: 2}

@@ -24,5 +24,10 @@ namespace ProjectSun.FPS.Weapons
         [Min(0.1f)] public float blastRadius = 4f;
         [Min(0f)] public float damage = 120f;
         [Min(1f)] public float lifetimeSeconds = 90f;
+
+        [Header("Throwable Parameters")]
+        [Min(0.1f)] public float throwSpeed = 15f;
+        [Min(0f)] public float throwUpwardSpeed = 2.2f;
+        [Min(0.05f)] public float fuseSeconds = 2.5f;
     }
 }

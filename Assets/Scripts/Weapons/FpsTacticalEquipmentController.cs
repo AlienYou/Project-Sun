@@ -14,7 +14,7 @@ namespace ProjectSun.FPS.Weapons
     [DisallowMultipleComponent]
     public sealed class FpsTacticalEquipmentController : MonoBehaviour
     {
-        private readonly List<ProximityMine> deployedMines = new List<ProximityMine>();
+        private readonly List<GameObject> activeEquipmentActors = new List<GameObject>();
 
         private FpsPlayerController player;
         private FpsInput input;
@@ -44,12 +44,19 @@ namespace ProjectSun.FPS.Weapons
 
         public void SetGameplayInputEnabled(bool enabled) => gameplayInputEnabled = enabled;
 
-        /// <summary>Called by the round authority. Mines persist during a round but never into the next one.</summary>
+        /// <summary>Called by the round authority. Tactical actors persist during a round but never into the next one.</summary>
         public void ResetForRound()
         {
-            foreach (ProximityMine mine in deployedMines)
-                if (mine != null) Destroy(mine.gameObject);
-            deployedMines.Clear();
+            foreach (GameObject actor in activeEquipmentActors)
+            {
+                if (actor == null) continue;
+                ProximityMine mine = actor.GetComponent<ProximityMine>();
+                if (mine != null) mine.DetachOwner();
+                FragGrenade grenade = actor.GetComponent<FragGrenade>();
+                if (grenade != null) grenade.DetachOwner();
+                Destroy(actor);
+            }
+            activeEquipmentActors.Clear();
             nextUseAt = 0f;
             RefreshPreparedEquipment(true);
         }
@@ -69,7 +76,7 @@ namespace ProjectSun.FPS.Weapons
         {
             // Active rounds lock PlayerMatchLoadout, so a change here can only originate from preparation or
             // the unrestricted WeaponLab. Refill the newly selected equipment when no deployed actor exists.
-            if (deployedMines.Count == 0) RefreshPreparedEquipment(true);
+            if (activeEquipmentActors.Count == 0) RefreshPreparedEquipment(true);
         }
 
         private void RefreshPreparedEquipment(bool refillCharges)
@@ -105,13 +112,26 @@ namespace ProjectSun.FPS.Weapons
             }
             if (activeDefinition.type == TacticalEquipmentType.Throwable)
             {
-                statusLabel = "THROWABLE RUNTIME NOT AUTHORED";
+                if (!TryThrowSelectedEquipment()) return;
+            }
+            else if (!TryDeploySelectedEquipment())
+            {
                 return;
             }
+
+            chargesRemaining--;
+            nextUseAt = Time.time + activeDefinition.cooldownSeconds;
+            statusLabel = activeDefinition.type == TacticalEquipmentType.Throwable
+                ? $"{activeDefinition.displayName.ToUpperInvariant()}  THROWN  {chargesRemaining}/{activeDefinition.maxCharges}"
+                : $"{activeDefinition.displayName.ToUpperInvariant()}  DEPLOYED  {chargesRemaining}/{activeDefinition.maxCharges}";
+        }
+
+        private bool TryDeploySelectedEquipment()
+        {
             if (!TryGetDeploySurface(out RaycastHit hit))
             {
                 statusLabel = "NO DEPLOY SURFACE";
-                return;
+                return false;
             }
 
             GameObject mineObject = new GameObject(activeDefinition.displayName + " (Deployed)");
@@ -120,11 +140,29 @@ namespace ProjectSun.FPS.Weapons
             mineObject.layer = CombatLayers.IgnoreRaycastLayer;
             ProximityMine mine = mineObject.AddComponent<ProximityMine>();
             mine.Configure(activeDefinition, gameObject, OnMineResolved);
-            deployedMines.Add(mine);
+            activeEquipmentActors.Add(mineObject);
+            return true;
+        }
 
-            chargesRemaining--;
-            nextUseAt = Time.time + activeDefinition.cooldownSeconds;
-            statusLabel = $"{activeDefinition.displayName.ToUpperInvariant()}  DEPLOYED  {chargesRemaining}/{activeDefinition.maxCharges}";
+        private bool TryThrowSelectedEquipment()
+        {
+            if (playerCamera == null)
+            {
+                statusLabel = "NO THROW CAMERA";
+                return false;
+            }
+
+            Transform cameraTransform = playerCamera.transform;
+            Vector3 spawnPosition = cameraTransform.position + cameraTransform.forward * 0.45f + cameraTransform.up * -0.08f;
+            GameObject grenadeObject = new GameObject(activeDefinition.displayName + " (Thrown)");
+            grenadeObject.transform.SetPositionAndRotation(spawnPosition, cameraTransform.rotation);
+            grenadeObject.layer = CombatLayers.IgnoreRaycastLayer;
+            FragGrenade grenade = grenadeObject.AddComponent<FragGrenade>();
+            Vector3 initialVelocity = cameraTransform.forward * activeDefinition.throwSpeed +
+                cameraTransform.up * activeDefinition.throwUpwardSpeed;
+            grenade.Configure(activeDefinition, gameObject, initialVelocity, OnGrenadeResolved);
+            activeEquipmentActors.Add(grenadeObject);
+            return true;
         }
 
         private bool TryGetDeploySurface(out RaycastHit hit)
@@ -137,7 +175,17 @@ namespace ProjectSun.FPS.Weapons
 
         private void OnMineResolved(ProximityMine mine, bool detonated)
         {
-            deployedMines.Remove(mine);
+            OnEquipmentResolved(mine != null ? mine.gameObject : null, detonated);
+        }
+
+        private void OnGrenadeResolved(FragGrenade grenade, bool detonated)
+        {
+            OnEquipmentResolved(grenade != null ? grenade.gameObject : null, detonated);
+        }
+
+        private void OnEquipmentResolved(GameObject actor, bool detonated)
+        {
+            if (actor != null) activeEquipmentActors.Remove(actor);
             if (activeDefinition == null) return;
             statusLabel = detonated
                 ? $"{activeDefinition.displayName.ToUpperInvariant()}  TRIGGERED"

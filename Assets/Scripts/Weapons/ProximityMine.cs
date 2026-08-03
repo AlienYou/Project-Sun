@@ -35,6 +35,9 @@ namespace ProjectSun.FPS.Weapons
             CreateDebugVisual();
         }
 
+        /// <summary>Used by round teardown so an intentional cleanup does not overwrite the fresh HUD state.</summary>
+        public void DetachOwner() => resolvedCallback = null;
+
         private void Update()
         {
             if (resolved || definition == null) return;

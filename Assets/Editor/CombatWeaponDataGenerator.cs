@@ -15,6 +15,7 @@ namespace ProjectSun.FPS.Editor
         private const string DefinitionPath = DataRoot + "/Definitions/AR4Carbine.asset";
         private const string SidearmDefinitionPath = DataRoot + "/Definitions/HG3Sidearm.asset";
         private const string SensorMinePath = DataRoot + "/Tactical/S1SensorMine.asset";
+        private const string FragGrenadePath = DataRoot + "/Tactical/F1FragGrenade.asset";
         private const string CatalogPath = DataRoot + "/Catalogs/AR4LoadoutCatalog.asset";
         private const string ScenePath = "Assets/_ProjectSun/Scenes/CombatSlice.unity";
 
@@ -64,6 +65,7 @@ namespace ProjectSun.FPS.Editor
             sidearm.aimCapability = WeaponAimCapability.SupportsAds;
 
             TacticalEquipmentDefinition sensorMine = CreateOrGetSensorMine();
+            TacticalEquipmentDefinition fragGrenade = CreateOrGetFragGrenade();
 
             List<WeaponAttachment> attachments = new List<WeaponAttachment>
             {
@@ -94,7 +96,7 @@ namespace ProjectSun.FPS.Editor
             }
             catalog.SetContents(weapon, attachments);
             catalog.SetWeaponSlots(new[] { weapon }, new[] { sidearm });
-            catalog.SetTacticalEquipment(new[] { sensorMine });
+            catalog.SetTacticalEquipment(new[] { sensorMine, fragGrenade });
             EditorUtility.SetDirty(catalog);
             return catalog;
         }
@@ -121,6 +123,29 @@ namespace ProjectSun.FPS.Editor
             sensorMine.lifetimeSeconds = 90f;
             EditorUtility.SetDirty(sensorMine);
             return sensorMine;
+        }
+
+        private static TacticalEquipmentDefinition CreateOrGetFragGrenade()
+        {
+            TacticalEquipmentDefinition fragGrenade = AssetDatabase.LoadAssetAtPath<TacticalEquipmentDefinition>(FragGrenadePath);
+            if (fragGrenade == null)
+            {
+                fragGrenade = ScriptableObject.CreateInstance<TacticalEquipmentDefinition>();
+                AssetDatabase.CreateAsset(fragGrenade, FragGrenadePath);
+            }
+
+            fragGrenade.displayName = "F-1 FRAG GRENADE";
+            fragGrenade.description = "Throws a bouncing grenade that detonates after a short fuse.";
+            fragGrenade.type = TacticalEquipmentType.Throwable;
+            fragGrenade.cooldownSeconds = 14f;
+            fragGrenade.maxCharges = 1;
+            fragGrenade.throwSpeed = 15f;
+            fragGrenade.throwUpwardSpeed = 2.2f;
+            fragGrenade.fuseSeconds = 2.5f;
+            fragGrenade.blastRadius = 5f;
+            fragGrenade.damage = 140f;
+            EditorUtility.SetDirty(fragGrenade);
+            return fragGrenade;
         }
 
         private static WeaponAttachment CreateAttachment(string assetName, AttachmentSlot slot, string displayName, float damage = 1f,
