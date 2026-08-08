@@ -1,4 +1,5 @@
 using ProjectSun.FPS.Bootstrap;
+using ProjectSun.FPS.Presentation;
 using ProjectSun.FPS.Weapons;
 using ProjectSun.FPS.World;
 using UnityEngine;
@@ -13,6 +14,7 @@ namespace ProjectSun.FPS.UI
         private HitscanWeapon weapon;
         private WeaponInventoryController inventory;
         private WeaponLabController lab;
+        private ScopeSightRenderer scopeRenderer;
         private float lastHitDistance = -1f;
         private string lastHitName = "NO DAMAGE TARGET HIT";
         private GUIStyle titleStyle;
@@ -25,6 +27,7 @@ namespace ProjectSun.FPS.UI
             weapon = player != null ? player.Weapon : null;
             inventory = player != null ? player.WeaponInventory : null;
             lab = labController;
+            scopeRenderer = weapon != null ? weapon.GetComponent<ScopeSightRenderer>() : null;
             if (weapon != null) weapon.HitConfirmed += RecordHit;
         }
 
@@ -61,6 +64,35 @@ namespace ProjectSun.FPS.UI
                 $"Last hit    {hitState}", bodyStyle);
             GUI.Label(new Rect(panel.x + 14f, panel.yMax - 24f, panel.width - 28f, 18f),
                 $"[{(lab != null ? lab.ResetLabKey : KeyCode.F6)}] RESET LAB", bodyStyle);
+
+            DrawScopeDiagnostics(width, panel.yMax + 10f);
+        }
+
+        private void DrawScopeDiagnostics(float screenWidth, float top)
+        {
+            if (!weapon.IsAiming) return;
+            if (scopeRenderer == null) scopeRenderer = weapon.GetComponent<ScopeSightRenderer>();
+
+            const float previewSize = 132f;
+            Rect panel = new Rect(screenWidth - 310f, top, 286f, 190f);
+            GUI.Box(panel, GUIContent.none);
+            GUI.Label(new Rect(panel.x + 12f, panel.y + 8f, panel.width - 24f, 20f),
+                "SCOPE RENDER DIAGNOSTICS", titleStyle);
+            if (scopeRenderer == null)
+            {
+                GUI.Label(new Rect(panel.x + 12f, panel.y + 34f, panel.width - 24f, 40f),
+                    "Status  RENDERER NOT CREATED", bodyStyle);
+                return;
+            }
+
+            Texture texture = scopeRenderer.ScopeTexture;
+            Rect preview = new Rect(panel.x + 10f, panel.y + 38f, previewSize, previewSize);
+            GUI.Box(new Rect(preview.x - 2f, preview.y - 2f, preview.width + 4f, preview.height + 4f), GUIContent.none);
+            if (texture != null) GUI.DrawTexture(preview, texture, ScaleMode.StretchToFill, false);
+
+            string textureSize = texture != null ? $"{texture.width}x{texture.height}" : "NONE";
+            GUI.Label(new Rect(panel.x + 152f, panel.y + 38f, 124f, 132f),
+                $"Status\n{scopeRenderer.DiagnosticStatus}\n\nRT  {textureSize}\nFOV {scopeRenderer.ScopeFieldOfView:0.0}\u00b0\nAnchor\n{scopeRenderer.ActiveAnchorName}", bodyStyle);
         }
 
         private void RecordHit(RaycastHit hit)

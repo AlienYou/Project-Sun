@@ -32,6 +32,7 @@ namespace ProjectSun.FPS.Weapons
 
         public WeaponStats Stats => stats;
         public WeaponLoadout Loadout => loadout;
+        public Camera ViewCamera => viewCamera;
         public int AmmoInMagazine => ammoInMagazine;
         public bool IsReloading => reloading;
         public bool IsAiming { get; private set; }

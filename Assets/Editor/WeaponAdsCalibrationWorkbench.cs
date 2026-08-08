@@ -21,7 +21,7 @@ namespace ProjectSun.FPS.Editor
         private const double AttachmentPrefabAutosaveDelaySeconds = 0.45d;
 
         private enum PreviewMode { Hip, Ads, Compare }
-        private enum AttachmentSceneEditMode { None, ModelPosition, ModelRotation, AimAnchorPosition }
+        private enum AttachmentSceneEditMode { None, ModelPosition, ModelRotation, AimAnchorPosition, AimAnchorRotation }
 
         [SerializeField] private WeaponInventorySlot selectedSlot = WeaponInventorySlot.Primary;
         [SerializeField] private WeaponAttachment selectedOptic;
@@ -115,13 +115,13 @@ namespace ProjectSun.FPS.Editor
             }
         }
 
-        private readonly struct ProbeModelRelativePose
+        private readonly struct CalibrationDependentPose
         {
             public readonly Transform Transform;
             public readonly Vector3 LocalPosition;
             public readonly Quaternion LocalRotation;
 
-            public ProbeModelRelativePose(Transform transform, Vector3 localPosition, Quaternion localRotation)
+            public CalibrationDependentPose(Transform transform, Vector3 localPosition, Quaternion localRotation)
             {
                 Transform = transform;
                 LocalPosition = localPosition;
@@ -295,7 +295,7 @@ namespace ProjectSun.FPS.Editor
 
             if (selectedOptic == null)
             {
-                EditorGUILayout.HelpBox("当前预览使用武器原生 Aim Anchor。选择一个已绑定第一人称外观的瞄具后，工作台会复用运行时装配链路。",
+                EditorGUILayout.HelpBox("当前预览使用武器原生 ADS 瞄准基准（AimAnchor）。选择一个已绑定第一人称外观的瞄具后，工作台会复用运行时装配链路。",
                     MessageType.Info);
                 return;
             }
@@ -365,11 +365,14 @@ namespace ProjectSun.FPS.Editor
 
             Transform aimAnchor = FindDescendant(loadedAttachmentPrefabContents.transform,
                 loadedAttachmentVisual.AimAnchorName);
-            Transform model = loadedAttachmentPrefabContents.transform.Find("Model");
+            Transform calibrationTarget = FindAttachmentCalibrationTransform(loadedAttachmentPrefabContents.transform);
+            AdsSightReference sightReference = aimAnchor != null ? aimAnchor.GetComponent<AdsSightReference>() : null;
             if (previewActive && aimAnchor != null)
                 ApplyAttachmentPrefabEditsToLivePreviews(loadedAttachmentVisual, true, aimAnchor.localPosition,
-                    model != null, model != null ? model.localPosition : Vector3.zero,
-                    model != null ? model.localEulerAngles : Vector3.zero, model != null ? model.localScale : Vector3.one);
+                    aimAnchor.localEulerAngles, sightReference != null && sightReference.OrientationAuthored,
+                    calibrationTarget != null, calibrationTarget != null ? calibrationTarget.localPosition : Vector3.zero,
+                    calibrationTarget != null ? calibrationTarget.localEulerAngles : Vector3.zero,
+                    calibrationTarget != null ? calibrationTarget.localScale : Vector3.one);
             Repaint();
         }
 
@@ -377,10 +380,10 @@ namespace ProjectSun.FPS.Editor
         {
             EditorGUILayout.LabelField("Scene 直接编辑", EditorStyles.miniBoldLabel);
             attachmentSceneEditMode = (AttachmentSceneEditMode)GUILayout.Toolbar((int)attachmentSceneEditMode,
-                new[] { "关闭", "移动模型", "旋转模型", "移动 Aim Anchor" });
+                new[] { "关闭", "移整体", "转整体", "移 ADS 基准", "转 ADS 光轴" });
             if (attachmentSceneEditMode == AttachmentSceneEditMode.None) return;
             EditorGUILayout.HelpBox(previewActive
-                    ? "切到 Scene 视图，拖拽当前显示的彩色手柄即可直接校准。模型位置用蓝色，模型旋转用绿色，Aim Anchor 用黄色；松开鼠标后可用 Ctrl+Z 撤销整次拖拽。"
+                    ? "切到 Scene 视图，拖拽当前显示的彩色手柄即可直接校准。整体挂载用蓝/绿色，ADS 瞄准基准与光轴用黄色；松开鼠标后可用 Ctrl+Z 撤销整次拖拽。"
                     : "启动实时武器预览后，Scene 视图才会显示所选附件的直接编辑手柄。",
                 MessageType.None);
         }
@@ -423,32 +426,56 @@ namespace ProjectSun.FPS.Editor
             Transform aimAnchor = FindDescendant(prefabContents.transform, visual.AimAnchorName);
             if (aimAnchor == null)
             {
-                EditorGUILayout.HelpBox($"预制体缺少 Aim Anchor：{visual.AimAnchorName}", MessageType.Error);
+                EditorGUILayout.HelpBox($"预制体缺少 ADS 瞄准基准（AimAnchor）：{visual.AimAnchorName}", MessageType.Error);
                 return;
             }
 
-            Transform model = prefabContents.transform.Find("Model");
+            Transform calibrationTarget = FindAttachmentCalibrationTransform(prefabContents.transform);
+            bool hasCalibrationRoot = calibrationTarget != null &&
+                calibrationTarget.GetComponent<ViewmodelAttachmentCalibrationRoot>() != null;
             EditorGUILayout.HelpBox(
                 "这里直接编辑运行时动态装配所使用的附件模板。保存后当前 Player 预览会即时更新，不会重新切枪；打开预制体检查 Model 也不会失去本次工作会话。",
                 MessageType.Info);
 
-            EditorGUILayout.LabelField("瞄准锚点（附件本地）", EditorStyles.miniBoldLabel);
+            EditorGUILayout.LabelField("ADS 瞄准基准（附件本地）", EditorStyles.miniBoldLabel);
+            AdsSightReference sightReference = aimAnchor.GetComponent<AdsSightReference>();
             EditorGUI.BeginChangeCheck();
-            Vector3 newAnchorPosition = EditorGUILayout.Vector3Field("Aim Anchor 位置", aimAnchor.localPosition);
+            Vector3 newAnchorPosition = EditorGUILayout.Vector3Field("ADS 瞄准基准位置", aimAnchor.localPosition);
+            Vector3 newAnchorRotation = EditorGUILayout.Vector3Field("ADS 光轴旋转", aimAnchor.localEulerAngles);
+            bool orientationAuthored = EditorGUILayout.Toggle("使用已制作光轴", sightReference != null &&
+                sightReference.OrientationAuthored);
             bool anchorChanged = EditorGUI.EndChangeCheck();
+            if (sightReference == null)
+                EditorGUILayout.HelpBox("当前仍使用兼容模式：方向由 ADS 瞄准基准到枪口的连线推导。请先按当前视觉结果播种光轴。",
+                    MessageType.Warning);
+            else if (sightReference.OrientationAuthored)
+                EditorGUILayout.HelpBox("ADS 光轴姿态已制作：位置为理想观察参考，本地 +Z 指向目标，本地 +Y 为瞄具上方。",
+                    MessageType.Info);
+            using (new EditorGUI.DisabledScope(!previewActive))
+                if (GUILayout.Button("按当前视觉结果播种 ADS 光轴"))
+                {
+                    SeedAuthoredSightOrientation(visual, aimAnchor, calibrationTarget);
+                    return;
+                }
 
             Vector3 newModelPosition = Vector3.zero;
             Vector3 newModelRotation = Vector3.zero;
             Vector3 newModelScale = Vector3.one;
             bool modelChanged = false;
-            if (model != null)
+            if (calibrationTarget != null)
             {
                 EditorGUILayout.Space(3f);
-                EditorGUILayout.LabelField("模型挂载（附件本地）", EditorStyles.miniBoldLabel);
+                EditorGUILayout.LabelField("附件整体挂载校准", EditorStyles.miniBoldLabel);
+                if (!hasCalibrationRoot)
+                    EditorGUILayout.HelpBox("旧附件尚无 AttachmentCalibrationRoot；整体调整会用兼容路径同步锚点与探针。建议执行资源迁移工具。",
+                        MessageType.Warning);
+                else
+                    EditorGUILayout.HelpBox("统一校准根已生效：整体移动、旋转或缩放会同时带动模型、ADS 光轴、镜片与 Clip Probe。",
+                        MessageType.Info);
                 EditorGUI.BeginChangeCheck();
-                newModelPosition = EditorGUILayout.Vector3Field("Model 位置", model.localPosition);
-                newModelRotation = EditorGUILayout.Vector3Field("Model 旋转", model.localEulerAngles);
-                newModelScale = EditorGUILayout.Vector3Field("Model 缩放", model.localScale);
+                newModelPosition = EditorGUILayout.Vector3Field("整体位置", calibrationTarget.localPosition);
+                newModelRotation = EditorGUILayout.Vector3Field("整体旋转", calibrationTarget.localEulerAngles);
+                newModelScale = EditorGUILayout.Vector3Field("整体缩放", calibrationTarget.localScale);
                 modelChanged = EditorGUI.EndChangeCheck();
             }
             else
@@ -458,13 +485,32 @@ namespace ProjectSun.FPS.Editor
             }
 
             if (!anchorChanged && !modelChanged) return;
-            ApplyAttachmentPrefabAssetEdits(visual, aimAnchor, model, anchorChanged, newAnchorPosition, modelChanged,
-                newModelPosition, newModelRotation, newModelScale);
+            ApplyAttachmentPrefabAssetEdits(visual, aimAnchor, calibrationTarget, anchorChanged, newAnchorPosition,
+                newAnchorRotation, orientationAuthored, modelChanged, newModelPosition, newModelRotation, newModelScale);
+        }
+
+        private void SeedAuthoredSightOrientation(WeaponAttachmentViewmodelVisual visual, Transform assetAimAnchor,
+            Transform calibrationTarget)
+        {
+            if (previewRig == null || previewRig.AimAnchor == null || previewRig.Muzzle == null ||
+                assetAimAnchor == null) return;
+            if (!WeaponAdsAlignment.TryGetLegacySightFrameWorldRotation(previewRig.transform,
+                    previewRig.AimAnchor, previewRig.Muzzle, out Quaternion worldRotation))
+            {
+                Debug.LogError("无法从当前 ADS 视觉结果计算光轴；请确认枪口和 ADS 瞄准基准均有效。", this);
+                return;
+            }
+
+            Quaternion localRotation = Quaternion.Inverse(previewRig.AimAnchor.parent.rotation) * worldRotation;
+            ApplyAttachmentPrefabAssetEdits(visual, assetAimAnchor, calibrationTarget, true,
+                assetAimAnchor.localPosition, localRotation.eulerAngles, true, false, Vector3.zero, Vector3.zero,
+                Vector3.one);
         }
 
         private void ApplyAttachmentPrefabAssetEdits(WeaponAttachmentViewmodelVisual visual, Transform aimAnchor,
-            Transform model, bool anchorChanged, Vector3 newAnchorPosition, bool modelChanged, Vector3 newModelPosition,
-            Vector3 newModelRotation, Vector3 newModelScale, int undoGroup = -1)
+            Transform model, bool anchorChanged, Vector3 newAnchorPosition, Vector3 newAnchorRotation,
+            bool orientationAuthored, bool modelChanged, Vector3 newModelPosition, Vector3 newModelRotation,
+            Vector3 newModelScale, int undoGroup = -1)
         {
             if (!anchorChanged && !modelChanged) return;
             bool ownsUndoGroup = undoGroup < 0;
@@ -477,8 +523,13 @@ namespace ProjectSun.FPS.Editor
 
             if (anchorChanged && aimAnchor != null)
             {
-                Undo.RecordObject(aimAnchor, "Calibrate Attachment Aim Anchor");
+                Undo.RecordObject(aimAnchor, "校准附件 ADS 瞄准基准");
                 aimAnchor.localPosition = newAnchorPosition;
+                aimAnchor.localEulerAngles = newAnchorRotation;
+                AdsSightReference sightReference = aimAnchor.GetComponent<AdsSightReference>();
+                if (sightReference == null) sightReference = Undo.AddComponent<AdsSightReference>(aimAnchor.gameObject);
+                Undo.RecordObject(sightReference, "设置 ADS 光轴契约");
+                sightReference.SetOrientationAuthored(orientationAuthored);
             }
             if (modelChanged && model != null)
             {
@@ -499,20 +550,20 @@ namespace ProjectSun.FPS.Editor
             ScheduleAttachmentPrefabSave();
             if (ownsUndoGroup) Undo.CollapseUndoOperations(undoGroup);
             if (previewActive)
-                ApplyAttachmentPrefabEditsToLivePreviews(visual, anchorChanged, newAnchorPosition, modelChanged,
-                    newModelPosition, newModelRotation, newModelScale);
+                ApplyAttachmentPrefabEditsToLivePreviews(visual, anchorChanged, newAnchorPosition, newAnchorRotation,
+                    orientationAuthored, modelChanged, newModelPosition, newModelRotation, newModelScale);
         }
 
         private static string GetAttachmentEditUndoName(bool anchorChanged, bool modelChanged) =>
             anchorChanged && modelChanged
-                ? "Calibrate Attachment Model And Aim Anchor"
-                : anchorChanged ? "Calibrate Attachment Aim Anchor" : "Fit Attachment Model To Weapon";
+                ? "校准附件模型与 ADS 瞄准基准"
+                : anchorChanged ? "校准附件 ADS 瞄准基准" : "调整附件模型挂载";
 
         private void DrawLiveAttachmentAlignmentStatus()
         {
             if (!previewActive)
             {
-                EditorGUILayout.HelpBox("启动实时武器预览后，这里的模型和 Aim Anchor 改动会立即反映到腰射、ADS 以及 Scene 辅助线中。",
+                EditorGUILayout.HelpBox("启动实时武器预览后，这里的模型和 ADS 瞄准基准改动会立即反映到腰射、ADS 以及 Scene 辅助线中。",
                     MessageType.None);
                 return;
             }
@@ -526,7 +577,7 @@ namespace ProjectSun.FPS.Editor
 
             if (!TryMeasureAlignment(out float screenErrorPixels))
             {
-                EditorGUILayout.HelpBox("无法测量当前附件的准心偏差；请检查 Aim Anchor 是否位于相机前方。", MessageType.Error);
+                EditorGUILayout.HelpBox("无法测量当前附件的准心偏差；请检查 ADS 瞄准基准是否位于相机前方。", MessageType.Error);
                 return;
             }
 
@@ -534,8 +585,21 @@ namespace ProjectSun.FPS.Editor
             EditorGUILayout.HelpBox(
                 passed
                     ? $"当前附件对齐：通过（误差 {screenErrorPixels:0.00}px / 阈值 {ScreenTolerancePixels:0.00}px）。"
-                    : $"当前附件对齐：待微调（误差 {screenErrorPixels:0.00}px / 阈值 {ScreenTolerancePixels:0.00}px）。保持 Aim Anchor 位于真实镜片中心，并使用“武器整体 ADS 姿态”移动整把武器；不要移动 Model 来追准心。",
+                    : $"当前附件对齐：待微调（误差 {screenErrorPixels:0.00}px / 阈值 {ScreenTolerancePixels:0.00}px）。保持 ADS 瞄准基准位于瞄具光轴中心，并使用“武器整体 ADS 姿态”移动整把武器；不要移动 Model 来追准心。",
                 passed ? MessageType.Info : MessageType.Warning);
+
+            AdsSightReference authoredReference = previewRig.AimAnchor != null
+                ? previewRig.AimAnchor.GetComponent<AdsSightReference>()
+                : null;
+            if (authoredReference == null || !authoredReference.OrientationAuthored)
+                EditorGUILayout.HelpBox("ADS 光轴方向尚未制作，当前仍由瞄准基准到枪口的连线兼容推导。",
+                    MessageType.Warning);
+            else
+            {
+                float axisError = Vector3.Angle(previewRig.AimAnchor.forward, previewCamera.transform.forward);
+                EditorGUILayout.HelpBox($"ADS 光轴姿态有效；当前与相机前向夹角 {axisError:0.00}°。",
+                    MessageType.Info);
+            }
         }
 
         private void DrawWeaponProfileEditor()
@@ -577,7 +641,7 @@ namespace ProjectSun.FPS.Editor
 
             if (profile == null)
             {
-                EditorGUILayout.HelpBox("此武器配置为仅腰射：无需 ADS Profile 或 Aim Anchor。工作台仍可用于调整腰射表现。",
+                EditorGUILayout.HelpBox("此武器配置为仅腰射：无需 ADS Profile 或 ADS 瞄准基准。工作台仍可用于调整腰射表现。",
                     MessageType.Info);
                 return;
             }
@@ -602,7 +666,7 @@ namespace ProjectSun.FPS.Editor
             {
                 if (selectedOptic != null)
                     EditorGUILayout.HelpBox(
-                        "动态瞄具的 ADS 对齐应使用工作台下方“武器整体 ADS 姿态”或此瞄具专属 ADS Profile；它会带动整把武器，瞄具仍固定在导轨上。Aim Anchor 只在其物理位置错误时修正；不要通过移动附件 Model 来追准心。",
+                        "动态瞄具的 ADS 对齐应使用工作台下方“武器整体 ADS 姿态”或此瞄具专属 ADS Profile；它会带动整把武器，瞄具仍固定在导轨上。ADS 瞄准基准只在光轴参考位置错误时修正；不要通过移动附件 Model 来追准心。",
                         MessageType.None);
                 EditorGUILayout.PropertyField(referenceOffset, new GUIContent("整体瞄具参考修正（移动整把武器）"));
                 EditorGUILayout.PropertyField(positionOffset, new GUIContent("整体相机空间位置微调"));
@@ -804,14 +868,14 @@ namespace ProjectSun.FPS.Editor
                 EditorStyles.wordWrappedMiniLabel);
             if (!HasAdsPreview)
             {
-                EditorGUILayout.HelpBox("当前武器为仅腰射配置：无需机瞄对齐、ADS Profile 或 Aim Anchor。", MessageType.Info);
+                EditorGUILayout.HelpBox("当前武器为仅腰射配置：无需机瞄对齐、ADS Profile 或 ADS 瞄准基准。", MessageType.Info);
                 return;
             }
             if (previewActive) DrawClipProbeValidationStatus();
             if (!previewActive || !CanPreview() || previewMode == PreviewMode.Hip) return;
             if (!TryMeasureAlignment(out float screenErrorPixels))
             {
-                EditorGUILayout.HelpBox("无法测量机瞄参考点：请确认 Aim Anchor 位于相机前方。", MessageType.Error);
+                EditorGUILayout.HelpBox("无法测量机瞄参考点：请确认 ADS 瞄准基准位于相机前方。", MessageType.Error);
                 return;
             }
 
@@ -1507,22 +1571,30 @@ namespace ProjectSun.FPS.Editor
             return null;
         }
 
-        private void ApplyAttachmentPrefabEditsToLivePreviews(WeaponAttachmentViewmodelVisual visual,
-            bool updateAnchor, Vector3 anchorPosition, bool updateModel, Vector3 modelPosition,
-            Vector3 modelRotation, Vector3 modelScale)
+        private static Transform FindAttachmentCalibrationTransform(Transform attachmentRoot)
         {
-            ApplyAttachmentPrefabEdits(previewRig, visual, updateAnchor, anchorPosition, updateModel, modelPosition,
-                modelRotation, modelScale);
-            ApplyAttachmentPrefabEdits(cameraPreviewRig, visual, updateAnchor, anchorPosition, updateModel,
-                modelPosition, modelRotation, modelScale);
-            ApplyAttachmentPrefabEdits(adsPreviewRig, visual, updateAnchor, anchorPosition, updateModel,
-                modelPosition, modelRotation, modelScale);
+            if (attachmentRoot == null) return null;
+            ViewmodelAttachmentCalibrationRoot calibrationRoot =
+                attachmentRoot.GetComponentInChildren<ViewmodelAttachmentCalibrationRoot>(true);
+            return calibrationRoot != null ? calibrationRoot.transform : attachmentRoot.Find("Model");
+        }
+
+        private void ApplyAttachmentPrefabEditsToLivePreviews(WeaponAttachmentViewmodelVisual visual,
+            bool updateAnchor, Vector3 anchorPosition, Vector3 anchorRotation, bool orientationAuthored,
+            bool updateModel, Vector3 modelPosition, Vector3 modelRotation, Vector3 modelScale)
+        {
+            ApplyAttachmentPrefabEdits(previewRig, visual, updateAnchor, anchorPosition, anchorRotation,
+                orientationAuthored, updateModel, modelPosition, modelRotation, modelScale);
+            ApplyAttachmentPrefabEdits(cameraPreviewRig, visual, updateAnchor, anchorPosition, anchorRotation,
+                orientationAuthored, updateModel, modelPosition, modelRotation, modelScale);
+            ApplyAttachmentPrefabEdits(adsPreviewRig, visual, updateAnchor, anchorPosition, anchorRotation,
+                orientationAuthored, updateModel, modelPosition, modelRotation, modelScale);
             TickPreview();
         }
 
         private void ApplyAttachmentPrefabEdits(LowPolyShooterViewmodelRig rig, WeaponAttachmentViewmodelVisual visual,
-            bool updateAnchor, Vector3 anchorPosition, bool updateModel, Vector3 modelPosition,
-            Vector3 modelRotation, Vector3 modelScale)
+            bool updateAnchor, Vector3 anchorPosition, Vector3 anchorRotation, bool orientationAuthored,
+            bool updateModel, Vector3 modelPosition, Vector3 modelRotation, Vector3 modelScale)
         {
             if (rig == null || selectedOptic == null || visual == null) return;
             Transform attachmentRoot = FindDescendant(rig.transform,
@@ -1532,12 +1604,19 @@ namespace ProjectSun.FPS.Editor
             if (updateAnchor)
             {
                 Transform anchor = FindDescendant(attachmentRoot, visual.AimAnchorName);
-                if (anchor != null) anchor.localPosition = anchorPosition;
+                if (anchor != null)
+                {
+                    anchor.localPosition = anchorPosition;
+                    anchor.localEulerAngles = anchorRotation;
+                    AdsSightReference sightReference = anchor.GetComponent<AdsSightReference>();
+                    if (sightReference == null) sightReference = anchor.gameObject.AddComponent<AdsSightReference>();
+                    sightReference.SetOrientationAuthored(orientationAuthored);
+                }
             }
 
             if (updateModel)
             {
-                Transform model = attachmentRoot.Find("Model");
+                Transform model = FindAttachmentCalibrationTransform(attachmentRoot);
                 if (model == null) return;
                 SetModelPoseAndMoveAttachmentProbes(model, modelPosition, modelRotation, modelScale);
             }
@@ -1547,36 +1626,45 @@ namespace ProjectSun.FPS.Editor
             Vector3 localRotation, Vector3 localScale)
         {
             if (model == null) return;
-            List<ProbeModelRelativePose> siblingProbePoses = new List<ProbeModelRelativePose>();
+            List<CalibrationDependentPose> dependentPoses = new List<CalibrationDependentPose>();
             Transform attachmentRoot = model.parent;
             if (attachmentRoot != null)
             {
-                foreach (ViewmodelClipProbe probe in attachmentRoot.GetComponentsInChildren<ViewmodelClipProbe>(true))
+                foreach (Transform candidate in attachmentRoot.GetComponentsInChildren<Transform>(true))
                 {
-                    if (probe == null || probe.transform.IsChildOf(model)) continue;
-                    siblingProbePoses.Add(new ProbeModelRelativePose(probe.transform,
-                        model.InverseTransformPoint(probe.transform.position),
-                        Quaternion.Inverse(model.rotation) * probe.transform.rotation));
+                    if (candidate == null || candidate == model || candidate.IsChildOf(model)) continue;
+                    bool followsMechanicalFit = candidate.GetComponent<ViewmodelClipProbe>() != null ||
+                        candidate.GetComponent<ViewmodelScopeLens>() != null ||
+                        candidate.GetComponent<AdsSightReference>() != null || candidate.name.StartsWith("AimAnchor_");
+                    if (!followsMechanicalFit) continue;
+                    dependentPoses.Add(new CalibrationDependentPose(candidate,
+                        model.InverseTransformPoint(candidate.position),
+                        Quaternion.Inverse(model.rotation) * candidate.rotation));
                 }
             }
 
             model.localPosition = localPosition;
             model.localEulerAngles = localRotation;
             model.localScale = localScale;
-            foreach (ProbeModelRelativePose probePose in siblingProbePoses)
+            foreach (CalibrationDependentPose dependentPose in dependentPoses)
             {
-                if (probePose.Transform == null) continue;
-                probePose.Transform.SetPositionAndRotation(model.TransformPoint(probePose.LocalPosition),
-                    model.rotation * probePose.LocalRotation);
+                if (dependentPose.Transform == null) continue;
+                dependentPose.Transform.SetPositionAndRotation(model.TransformPoint(dependentPose.LocalPosition),
+                    model.rotation * dependentPose.LocalRotation);
             }
         }
 
         private static void RecordSiblingProbeUndo(Transform model)
         {
             if (model == null || model.parent == null) return;
-            foreach (ViewmodelClipProbe probe in model.parent.GetComponentsInChildren<ViewmodelClipProbe>(true))
-                if (probe != null && !probe.transform.IsChildOf(model))
-                    Undo.RecordObject(probe.transform, "Fit Attachment Model To Weapon");
+            foreach (Transform candidate in model.parent.GetComponentsInChildren<Transform>(true))
+            {
+                if (candidate == null || candidate == model || candidate.IsChildOf(model)) continue;
+                if (candidate.GetComponent<ViewmodelClipProbe>() != null ||
+                    candidate.GetComponent<ViewmodelScopeLens>() != null ||
+                    candidate.GetComponent<AdsSightReference>() != null || candidate.name.StartsWith("AimAnchor_"))
+                    Undo.RecordObject(candidate, "同步附件校准节点");
+            }
         }
 
         private void DrawAttachmentSceneEditHandle()
@@ -1591,9 +1679,11 @@ namespace ProjectSun.FPS.Editor
             if (attachmentRoot == null) return;
 
             Transform assetAnchor = FindDescendant(loadedAttachmentPrefabContents.transform, visual.AimAnchorName);
-            Transform assetModel = loadedAttachmentPrefabContents.transform.Find("Model");
+            Transform assetModel = FindAttachmentCalibrationTransform(loadedAttachmentPrefabContents.transform);
             Transform liveAnchor = FindDescendant(attachmentRoot, visual.AimAnchorName);
-            Transform liveModel = attachmentRoot.Find("Model");
+            Transform liveModel = FindAttachmentCalibrationTransform(attachmentRoot);
+            bool orientationAuthored = assetAnchor != null &&
+                assetAnchor.GetComponent<AdsSightReference>()?.OrientationAuthored == true;
 
             switch (attachmentSceneEditMode)
             {
@@ -1605,8 +1695,8 @@ namespace ProjectSun.FPS.Editor
                     Vector3 modelPosition = Handles.PositionHandle(liveModel.position, liveModel.rotation);
                     if (EditorGUI.EndChangeCheck())
                     {
-                        ApplyAttachmentPrefabAssetEdits(visual, assetAnchor, assetModel, false, Vector3.zero, true,
-                            liveModel.parent.InverseTransformPoint(modelPosition), assetModel.localEulerAngles,
+                        ApplyAttachmentPrefabAssetEdits(visual, assetAnchor, assetModel, false, Vector3.zero,
+                            Vector3.zero, false, true, liveModel.parent.InverseTransformPoint(modelPosition), assetModel.localEulerAngles,
                             assetModel.localScale, BeginAttachmentSceneUndo(false, true));
                     }
                     break;
@@ -1620,8 +1710,8 @@ namespace ProjectSun.FPS.Editor
                     if (EditorGUI.EndChangeCheck())
                     {
                         Quaternion localRotation = Quaternion.Inverse(liveModel.parent.rotation) * modelRotation;
-                        ApplyAttachmentPrefabAssetEdits(visual, assetAnchor, assetModel, false, Vector3.zero, true,
-                            assetModel.localPosition, localRotation.eulerAngles, assetModel.localScale,
+                        ApplyAttachmentPrefabAssetEdits(visual, assetAnchor, assetModel, false, Vector3.zero,
+                            Vector3.zero, false, true, assetModel.localPosition, localRotation.eulerAngles, assetModel.localScale,
                             BeginAttachmentSceneUndo(false, true));
                     }
                     break;
@@ -1629,14 +1719,30 @@ namespace ProjectSun.FPS.Editor
                 case AttachmentSceneEditMode.AimAnchorPosition:
                     if (assetAnchor == null || liveAnchor == null) return;
                     Handles.color = new Color(1f, 0.78f, 0.15f, 0.95f);
-                    Handles.Label(liveAnchor.position, " ATTACHMENT AIM ANCHOR");
+                    Handles.Label(liveAnchor.position, " ADS SIGHT REFERENCE");
                     EditorGUI.BeginChangeCheck();
                     Vector3 anchorPosition = Handles.PositionHandle(liveAnchor.position, liveAnchor.rotation);
                     if (EditorGUI.EndChangeCheck())
                     {
                         ApplyAttachmentPrefabAssetEdits(visual, assetAnchor, assetModel, true,
-                            liveAnchor.parent.InverseTransformPoint(anchorPosition), false, Vector3.zero, Vector3.zero,
-                            Vector3.one, BeginAttachmentSceneUndo(true, false));
+                            liveAnchor.parent.InverseTransformPoint(anchorPosition), assetAnchor.localEulerAngles,
+                            orientationAuthored, false, Vector3.zero, Vector3.zero, Vector3.one,
+                            BeginAttachmentSceneUndo(true, false));
+                    }
+                    break;
+
+                case AttachmentSceneEditMode.AimAnchorRotation:
+                    if (assetAnchor == null || liveAnchor == null) return;
+                    Handles.color = new Color(1f, 0.62f, 0.1f, 0.95f);
+                    Handles.Label(liveAnchor.position, " ADS OPTICAL AXIS");
+                    EditorGUI.BeginChangeCheck();
+                    Quaternion anchorRotation = Handles.RotationHandle(liveAnchor.rotation, liveAnchor.position);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Quaternion localRotation = Quaternion.Inverse(liveAnchor.parent.rotation) * anchorRotation;
+                        ApplyAttachmentPrefabAssetEdits(visual, assetAnchor, assetModel, true,
+                            assetAnchor.localPosition, localRotation.eulerAngles, true, false, Vector3.zero,
+                            Vector3.zero, Vector3.one, BeginAttachmentSceneUndo(true, false));
                     }
                     break;
             }
@@ -1672,6 +1778,17 @@ namespace ProjectSun.FPS.Editor
             Handles.Label(aimEnd, " CAMERA AIM");
 
             Vector3 sightReference = WeaponAdsAlignment.GetSightReferenceWorldPosition(previewRig.AimAnchor, profile);
+            if (previewRig.AimAnchor != null)
+            {
+                AdsSightReference authoredReference = previewRig.AimAnchor.GetComponent<AdsSightReference>();
+                bool authored = authoredReference != null && authoredReference.OrientationAuthored;
+                Handles.color = authored
+                    ? new Color(1f, 0.72f, 0.12f, 0.95f)
+                    : new Color(1f, 0.45f, 0.12f, 0.75f);
+                Vector3 opticalAxisEnd = sightReference + previewRig.AimAnchor.forward * 0.8f;
+                Handles.DrawAAPolyLine(authored ? 4f : 2f, sightReference, opticalAxisEnd);
+                Handles.Label(opticalAxisEnd, authored ? " AUTHORED ADS AXIS" : " LEGACY ADS AXIS (NOT AUTHORED)");
+            }
             if (showSightReferenceMarker)
             {
                 Handles.color = new Color(1f, 0.78f, 0.2f, 0.62f);
@@ -1739,15 +1856,15 @@ namespace ProjectSun.FPS.Editor
             string prefabPath = visual.Prefab != null ? AssetDatabase.GetAssetPath(visual.Prefab) : null;
             if (string.IsNullOrWhiteSpace(prefabPath) ||
                 !TryGetAttachmentPrefabContents(visual, prefabPath, out GameObject prefabContents)) return;
-            Transform assetModel = prefabContents.transform.Find("Model");
+            Transform assetModel = FindAttachmentCalibrationTransform(prefabContents.transform);
             Transform assetAnchor = FindDescendant(prefabContents.transform, visual.AimAnchorName);
             Transform attachmentRoot = FindDescendant(previewRig.transform,
                 selectedOptic.displayName + " (Attachment Visual)");
             if (assetModel == null || attachmentRoot == null) return;
 
             Vector3 localDelta = attachmentRoot.InverseTransformVector(desiredWorldMovement.normalized * visualNudgeStep);
-            ApplyAttachmentPrefabAssetEdits(visual, assetAnchor, assetModel, false, Vector3.zero, true,
-                assetModel.localPosition + localDelta, assetModel.localEulerAngles, assetModel.localScale);
+            ApplyAttachmentPrefabAssetEdits(visual, assetAnchor, assetModel, false, Vector3.zero, Vector3.zero,
+                false, true, assetModel.localPosition + localDelta, assetModel.localEulerAngles, assetModel.localScale);
         }
 
         private void SetVisualReferenceOffset(Vector3 newOffset, string undoLabel)

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using ProjectSun.FPS.Presentation;
 using UnityEngine;
 
 namespace ProjectSun.FPS.Weapons
@@ -12,6 +13,8 @@ namespace ProjectSun.FPS.Weapons
     {
         private readonly List<GameObject> spawnedVisuals = new List<GameObject>();
         private readonly List<GameObject> hiddenBuiltInVisuals = new List<GameObject>();
+        private readonly Dictionary<WeaponAttachment, GameObject> spawnedVisualsByAttachment =
+            new Dictionary<WeaponAttachment, GameObject>();
 
         /// <summary>Applies one active loadout and returns the sight reference that runtime ADS should use.</summary>
         public Transform Apply(WeaponLoadout loadout, Transform weaponRoot, Transform defaultAimAnchor,
@@ -37,6 +40,7 @@ namespace ProjectSun.FPS.Weapons
                 SetLayerRecursively(visual.transform, weaponRoot.gameObject.layer);
                 if (transientPreview) SetHideFlagsRecursively(visual.transform, HideFlags.HideAndDontSave);
                 spawnedVisuals.Add(visual);
+                spawnedVisualsByAttachment[attachment] = visual;
 
                 GameObject replaced = FindDescendant(weaponRoot, binding.ReplacedBuiltInVisualName)?.gameObject;
                 if (replaced != null && replaced.activeSelf)
@@ -50,6 +54,23 @@ namespace ProjectSun.FPS.Weapons
             return resolvedAimAnchor;
         }
 
+        /// <summary>Returns the live Aim Anchor used by one equipped optic visual, if it has been spawned.</summary>
+        public Transform GetActiveAimAnchor(WeaponAttachment attachment, WeaponDefinition weapon)
+        {
+            if (attachment == null || weapon == null || !spawnedVisualsByAttachment.TryGetValue(attachment, out GameObject visual) ||
+                visual == null || !attachment.TryGetViewmodelVisual(weapon, out WeaponAttachmentViewmodelVisual binding))
+                return null;
+            return FindDescendant(visual.transform, binding.AimAnchorName);
+        }
+
+        /// <summary>Returns the authored physical lens aperture without coupling it to the ADS anchor.</summary>
+        public ViewmodelScopeLens GetActiveScopeLens(WeaponAttachment attachment)
+        {
+            if (attachment == null || !spawnedVisualsByAttachment.TryGetValue(attachment, out GameObject visual) ||
+                visual == null) return null;
+            return visual.GetComponentInChildren<ViewmodelScopeLens>(true);
+        }
+
         public void Clear()
         {
             foreach (GameObject visual in spawnedVisuals)
@@ -58,8 +79,9 @@ namespace ProjectSun.FPS.Weapons
                     visual.SetActive(false);
                     if (Application.isPlaying) Destroy(visual);
                     else DestroyImmediate(visual);
-                }
+            }
             spawnedVisuals.Clear();
+            spawnedVisualsByAttachment.Clear();
 
             foreach (GameObject builtInVisual in hiddenBuiltInVisuals)
                 if (builtInVisual != null)

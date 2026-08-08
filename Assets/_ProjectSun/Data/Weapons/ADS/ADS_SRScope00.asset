@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   sightDistance: 0.18
   zeroDistance: 25
-  sightReferenceLocalOffset: {x: -0.0009843819, y: 0.034754205, z: 0.022303324}
+  sightReferenceLocalOffset: {x: -0.0009879245, y: 0.058251455, z: 0.001387334}
   cameraSpacePositionOffset: {x: 0, y: 0, z: 0}
   cameraSpaceRotationOffset: {x: 12.15, y: 0, z: 0}
   visualSightPlacementReviewed: 1

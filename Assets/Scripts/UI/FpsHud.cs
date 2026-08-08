@@ -1,5 +1,6 @@
 using ProjectSun.FPS.Abilities;
 using ProjectSun.FPS.Core;
+using ProjectSun.FPS.Presentation;
 using ProjectSun.FPS.Rounds;
 using ProjectSun.FPS.Weapons;
 using UnityEngine;
@@ -15,6 +16,8 @@ namespace ProjectSun.FPS.UI
         private Health health;
         private RoundManager roundManager;
         private FpsTacticalEquipmentController tacticalEquipment;
+        private ScopeSightRenderer scopeSightRenderer;
+        private WeaponAttachmentViewmodelPresenter attachmentPresenter;
         private float hitMarkerUntil;
         private float damageWarningUntil;
         private string damageDirection = string.Empty;
@@ -32,6 +35,7 @@ namespace ProjectSun.FPS.UI
             health = playerHealth;
             roundManager = combatRoundManager;
             tacticalEquipment = playerTacticalEquipment;
+            attachmentPresenter = null;
             if (weapon != null) weapon.HitConfirmed += ShowHitMarker;
             if (health != null) health.Damaged += ShowDamageWarning;
         }
@@ -40,6 +44,12 @@ namespace ProjectSun.FPS.UI
         {
             if (weapon != null) weapon.HitConfirmed -= ShowHitMarker;
             if (health != null) health.Damaged -= ShowDamageWarning;
+            if (scopeSightRenderer != null) scopeSightRenderer.SetSight(null, false, null, null);
+        }
+
+        private void Update()
+        {
+            UpdateMagnifiedSight();
         }
 
         private void OnGUI()
@@ -120,7 +130,35 @@ namespace ProjectSun.FPS.UI
         {
             WeaponAttachment optic = weapon.Loadout != null ? weapon.Loadout.GetEquipped(AttachmentSlot.Optic) : null;
             if (optic == null || optic.OpticSightProfile == null) return;
-            OpticReticleGui.Draw(optic.OpticSightProfile, new Rect(0f, 0f, width, height));
+            Rect viewport = scopeSightRenderer != null && scopeSightRenderer.IsActive
+                ? scopeSightRenderer.ReticleViewport
+                : new Rect(0f, 0f, width, height);
+            OpticReticleGui.Draw(optic.OpticSightProfile, viewport);
+        }
+
+        private void UpdateMagnifiedSight()
+        {
+            if (weapon == null) return;
+            WeaponAttachment optic = weapon.Loadout != null ? weapon.Loadout.GetEquipped(AttachmentSlot.Optic) : null;
+            OpticSightProfile profile = optic != null ? optic.OpticSightProfile : null;
+            if (profile == null || !profile.UsesMagnifiedLensRendering)
+            {
+                if (scopeSightRenderer != null) scopeSightRenderer.SetSight(null, false, null, null);
+                return;
+            }
+
+            Camera camera = weapon.ViewCamera;
+            if (camera == null) return;
+            if (scopeSightRenderer == null)
+            {
+                scopeSightRenderer = weapon.GetComponent<ScopeSightRenderer>();
+                if (scopeSightRenderer == null) scopeSightRenderer = weapon.gameObject.AddComponent<ScopeSightRenderer>();
+            }
+            if (attachmentPresenter == null) attachmentPresenter = weapon.GetComponent<WeaponAttachmentViewmodelPresenter>();
+            scopeSightRenderer.Configure(camera);
+            scopeSightRenderer.SetSight(profile, weapon.IsAiming,
+                attachmentPresenter != null ? attachmentPresenter.GetActiveAimAnchor(optic, weapon.Loadout.Weapon) : null,
+                attachmentPresenter != null ? attachmentPresenter.GetActiveScopeLens(optic) : null);
         }
 
         private void EnsureStyles()

@@ -146,6 +146,21 @@ namespace ProjectSun.FPS.Weapons
         [SerializeField] private Color reticleColor = new Color(1f, 0.18f, 0.12f, 0.92f);
         [SerializeField, Range(1f, 24f)] private float reticleSizePixels = 5f;
         [SerializeField, Range(8f, 120f)] private float frameSizePixels = 40f;
+        [Header("Magnified Lens Rendering")]
+        [Tooltip("Magnified scopes render a second, world-only view while ADS. Reflex and holographic sights ignore this value.")]
+        [SerializeField, Range(1f, 12f)] private float magnification = 4f;
+        [Tooltip("Diameter of the circular scope view as a fraction of the shorter screen dimension.")]
+        [SerializeField, Range(0.3f, 0.95f)] private float lensViewportScale = 0.68f;
+        [Tooltip("Darkening applied outside the scope lens while a magnified view is active.")]
+        [SerializeField, Range(0f, 0.9f)] private float outsideLensDim = 0.35f;
+        [Tooltip("Resolution scale for the off-screen lens view. This camera exists only while ADS.")]
+        [SerializeField, Range(0.25f, 1f)] private float lensRenderResolutionScale = 0.7f;
+        [SerializeField] private Texture2D lensMaskTexture;
+        [Header("Physical Lens Surface")]
+        [Tooltip("Diameter in metres of the generated first-person lens surface at the optic Aim Anchor.")]
+        [SerializeField, Range(0.005f, 0.15f)] private float lensPhysicalDiameter = 0.045f;
+        [Tooltip("Distance moved from the Aim Anchor toward the player's eye (local -Z) to keep the runtime lens in front of imported rear glass.")]
+        [SerializeField, Range(0f, 0.01f)] private float lensTowardCameraOffset = 0.0008f;
 
         public OpticSightType SightType => sightType;
         public OpticReticleStyle FallbackReticleStyle => fallbackReticleStyle;
@@ -154,6 +169,14 @@ namespace ProjectSun.FPS.Weapons
         public float ReticleSizePixels => reticleSizePixels;
         public float FrameSizePixels => frameSizePixels;
         public bool HasReticle => reticleTexture != null || fallbackReticleStyle != OpticReticleStyle.None;
+        public bool UsesMagnifiedLensRendering => sightType == OpticSightType.MagnifiedScope && magnification > 1.01f;
+        public float Magnification => magnification;
+        public float LensViewportScale => lensViewportScale;
+        public float OutsideLensDim => outsideLensDim;
+        public float LensRenderResolutionScale => lensRenderResolutionScale;
+        public Texture2D LensMaskTexture => lensMaskTexture;
+        public float LensPhysicalDiameter => lensPhysicalDiameter;
+        public float LensTowardCameraOffset => lensTowardCameraOffset;
 
         /// <summary>Used by owned setup tools; existing author-tuned assets are never overwritten by those tools.</summary>
         public void ConfigureDefaults(OpticSightType type, OpticReticleStyle style, Color color, float sizePixels,
@@ -164,6 +187,12 @@ namespace ProjectSun.FPS.Weapons
             reticleColor = color;
             reticleSizePixels = Mathf.Clamp(sizePixels, 1f, 24f);
             frameSizePixels = Mathf.Clamp(framePixels, 8f, 120f);
+            magnification = type == OpticSightType.MagnifiedScope ? 4f : 1f;
+            lensViewportScale = type == OpticSightType.MagnifiedScope ? 0.68f : 1f;
+            outsideLensDim = type == OpticSightType.MagnifiedScope ? 0.35f : 0f;
+            lensRenderResolutionScale = 0.7f;
+            lensPhysicalDiameter = type == OpticSightType.MagnifiedScope ? 0.045f : 0.02f;
+            lensTowardCameraOffset = 0.0008f;
         }
     }
 }

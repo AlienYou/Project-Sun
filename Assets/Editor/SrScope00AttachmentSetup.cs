@@ -15,6 +15,7 @@ namespace ProjectSun.FPS.Editor
     /// </summary>
     public static class SrScope00AttachmentSetup
     {
+        private const string CalibrationRootName = "AttachmentCalibrationRoot";
         private const string Ar4DefinitionPath = "Assets/_ProjectSun/Data/Weapons/Definitions/AR4Carbine.asset";
         private const string FallbackMaterialPath = "Assets/_ProjectSun/Art/Materials/Weapons/Attachments/M_ATT_Prototype_Dark.mat";
 
@@ -91,6 +92,20 @@ namespace ProjectSun.FPS.Editor
             Prepare(TanLrScope01, true);
         }
 
+        [MenuItem("Project Sun/Migrate Prepared Optic Calibration Contracts", priority = 21)]
+        public static void MigratePreparedOpticCalibrationContracts()
+        {
+            bool srMigrated = MigrateCalibrationContract(SrScope00);
+            bool tanMigrated = MigrateCalibrationContract(TanLrScope01);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            EditorUtility.DisplayDialog("Project Sun",
+                srMigrated && tanMigrated
+                    ? "现有倍镜已迁移到统一校准根。ADS 光轴仍使用兼容模式，请在 Workbench 中点击“按当前结果播种光轴”完成方向迁移。"
+                    : "部分倍镜无法迁移，请查看 Console。",
+                "确定");
+        }
+
         private static bool Prepare(OpticSetup setup, bool showSuccessDialog)
         {
             GameObject source = AssetDatabase.LoadAssetAtPath<GameObject>(setup.SourceFbxPath);
@@ -103,6 +118,7 @@ namespace ProjectSun.FPS.Editor
             GameObject outputRoot = new GameObject(Path.GetFileNameWithoutExtension(setup.OutputPrefabPath));
             try
             {
+                Transform calibrationRoot = CreateCalibrationRoot(outputRoot.transform);
                 GameObject modelInstance = PrefabUtility.InstantiatePrefab(source) as GameObject;
                 if (modelInstance == null)
                 {
@@ -111,15 +127,16 @@ namespace ProjectSun.FPS.Editor
                 }
 
                 modelInstance.name = "Model";
-                modelInstance.transform.SetParent(outputRoot.transform, false);
+                modelInstance.transform.SetParent(calibrationRoot, false);
                 PrefabUtility.UnpackPrefabInstance(modelInstance, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
                 RemoveExporterArtifacts(outputRoot.transform);
                 ConfigureRenderers(outputRoot.transform);
                 FitModelToScopeRail(modelInstance.transform);
 
-                Bounds modelBounds = CalculateBoundsRelativeTo(outputRoot.transform, modelInstance.transform);
-                CreateAimAnchor(outputRoot.transform, setup.AimAnchorName, SeedScopeAimAnchorLocalPose(modelBounds));
-                CreateClipProbe(outputRoot.transform, setup.DisplayName, modelBounds);
+                Bounds modelBounds = CalculateBoundsRelativeTo(calibrationRoot, modelInstance.transform);
+                CreateAimAnchor(calibrationRoot, setup.AimAnchorName, SeedScopeAimAnchorLocalPose(modelBounds));
+                CreateLensAnchor(calibrationRoot, setup.AimAnchorName, modelBounds);
+                CreateClipProbe(calibrationRoot, setup.DisplayName, modelBounds);
 
                 EnsureFolder("Assets/_ProjectSun/Prefabs/Weapons/Attachments");
                 PrefabUtility.SaveAsPrefabAsset(outputRoot, setup.OutputPrefabPath);
@@ -219,10 +236,88 @@ namespace ProjectSun.FPS.Editor
 
         private static void CreateAimAnchor(Transform parent, string anchorName, Pose localPose)
         {
-            GameObject anchor = new GameObject(anchorName);
+            GameObject anchor = new GameObject(anchorName, typeof(AdsSightReference));
             anchor.layer = CombatLayers.ViewmodelLayer;
             anchor.transform.SetParent(parent, false);
             anchor.transform.SetLocalPositionAndRotation(localPose.position, localPose.rotation);
+            // Imported axes must be verified against the equipped weapon before the authored rotation
+            // replaces the legacy anchor-to-muzzle direction. Workbench performs that lossless bake.
+            anchor.GetComponent<AdsSightReference>().SetOrientationAuthored(false);
+        }
+
+        private static Transform CreateCalibrationRoot(Transform attachmentRoot)
+        {
+            GameObject rootObject = new GameObject(CalibrationRootName,
+                typeof(ViewmodelAttachmentCalibrationRoot));
+            rootObject.layer = CombatLayers.ViewmodelLayer;
+            rootObject.transform.SetParent(attachmentRoot, false);
+            return rootObject.transform;
+        }
+
+        private static bool MigrateCalibrationContract(OpticSetup setup)
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(setup.OutputPrefabPath);
+            if (prefab == null)
+            {
+                Debug.LogError($"Cannot migrate missing optic prefab: {setup.OutputPrefabPath}");
+                return false;
+            }
+
+            GameObject contents = PrefabUtility.LoadPrefabContents(setup.OutputPrefabPath);
+            try
+            {
+                Transform calibrationRoot = contents.GetComponentInChildren<ViewmodelAttachmentCalibrationRoot>(true)?.transform;
+                if (calibrationRoot == null)
+                {
+                    calibrationRoot = CreateCalibrationRoot(contents.transform);
+                    List<Transform> childrenToMove = new List<Transform>();
+                    foreach (Transform child in contents.transform)
+                        if (child != calibrationRoot && IsCalibrationContent(child)) childrenToMove.Add(child);
+                    foreach (Transform child in childrenToMove) child.SetParent(calibrationRoot, false);
+                }
+
+                Transform aimAnchor = FindDescendant(contents.transform, setup.AimAnchorName);
+                if (aimAnchor == null)
+                {
+                    Debug.LogError($"{setup.DisplayName} is missing {setup.AimAnchorName}.");
+                    return false;
+                }
+                if (aimAnchor.GetComponent<AdsSightReference>() == null)
+                    aimAnchor.gameObject.AddComponent<AdsSightReference>();
+
+                PrefabUtility.SaveAsPrefabAsset(contents, setup.OutputPrefabPath);
+                return true;
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(contents);
+            }
+        }
+
+        private static bool IsCalibrationContent(Transform child)
+        {
+            return child.name == "Model" || child.name.StartsWith("AimAnchor_") ||
+                child.GetComponent<ViewmodelScopeLens>() != null || child.GetComponent<ViewmodelClipProbe>() != null;
+        }
+
+        private static Transform FindDescendant(Transform root, string objectName)
+        {
+            if (root == null || string.IsNullOrWhiteSpace(objectName)) return null;
+            foreach (Transform candidate in root.GetComponentsInChildren<Transform>(true))
+                if (candidate.name == objectName) return candidate;
+            return null;
+        }
+
+        private static void CreateLensAnchor(Transform parent, string aimAnchorName, Bounds modelBounds)
+        {
+            string lensAnchorName = aimAnchorName.Replace("AimAnchor_", "LensAnchor_");
+            GameObject lensObject = new GameObject(lensAnchorName, typeof(ViewmodelScopeLens));
+            lensObject.layer = CombatLayers.ViewmodelLayer;
+            lensObject.transform.SetParent(parent, false);
+            lensObject.transform.SetLocalPositionAndRotation(SeedScopeAimAnchorLocalPose(modelBounds).position,
+                Quaternion.identity);
+            float diameter = Mathf.Clamp(Mathf.Min(modelBounds.size.x, modelBounds.size.y) * 0.55f, 0.025f, 0.09f);
+            lensObject.GetComponent<ViewmodelScopeLens>().Configure(diameter);
         }
 
         private static void CreateClipProbe(Transform parent, string opticName, Bounds localBounds)
