@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6a1bcf897b4f48aca48931344305607b, type: 3}
   m_Name: F1FragGrenade
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   displayName: F-1 FRAG GRENADE
   description: Throws a bouncing grenade that detonates after a short fuse.
   type: 0

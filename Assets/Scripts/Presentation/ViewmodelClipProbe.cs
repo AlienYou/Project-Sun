@@ -14,17 +14,23 @@ namespace ProjectSun.FPS.Presentation
         [SerializeField] private string validationLabel;
         [SerializeField, Min(0.001f)] private float surfaceRadius = 0.012f;
         [SerializeField] private bool participatesInValidation = true;
+        [Tooltip("Optional visible object that owns this probe. The probe is ignored while this object is hidden by a replacement attachment.")]
+        [SerializeField] private GameObject visibilityOwner;
 
         public string ValidationLabel => string.IsNullOrWhiteSpace(validationLabel) ? gameObject.name : validationLabel;
         public float SurfaceRadius => Mathf.Max(0.001f, surfaceRadius);
         public bool ParticipatesInValidation => participatesInValidation;
+        public GameObject VisibilityOwner => visibilityOwner;
+        public bool IsActiveForValidation => participatesInValidation &&
+            (visibilityOwner == null || visibilityOwner.activeInHierarchy);
 
         /// <summary>Used by Project Sun setup tooling when seeding an owned weapon contract.</summary>
-        public void Configure(string label, float radius)
+        public void Configure(string label, float radius, GameObject owner = null)
         {
             validationLabel = label;
             surfaceRadius = Mathf.Max(0.001f, radius);
             participatesInValidation = true;
+            visibilityOwner = owner;
         }
 
         private void OnDrawGizmosSelected()

@@ -75,6 +75,7 @@ namespace ProjectSun.FPS.Weapons
         private Camera playerCamera;
         private LowPolyShooterViewmodel viewmodel;
         private WeaponFeedbackController feedback;
+        private WeaponAttachmentViewmodelPresenter attachmentPresenter;
         private int primaryAmmoInMagazine = -1;
         private int secondaryAmmoInMagazine = -1;
         private WeaponInventorySlot activeSlot;
@@ -97,13 +98,17 @@ namespace ProjectSun.FPS.Weapons
         public void Configure(FpsPlayerInstaller installer)
         {
             if (installer == null || installer.Weapon == null || installer.MatchLoadout == null) return;
+            if (matchLoadout != null) matchLoadout.Changed -= RefreshActiveAttachmentPresentation;
             weapon = installer.Weapon;
             matchLoadout = installer.MatchLoadout;
+            matchLoadout.Changed += RefreshActiveAttachmentPresentation;
             input = GetComponent<FpsInput>();
             player = installer.Player;
             playerCamera = installer.PlayerCamera;
             viewmodel = GetComponent<LowPolyShooterViewmodel>();
             feedback = GetComponent<WeaponFeedbackController>();
+            attachmentPresenter = GetComponent<WeaponAttachmentViewmodelPresenter>();
+            if (attachmentPresenter == null) attachmentPresenter = gameObject.AddComponent<WeaponAttachmentViewmodelPresenter>();
             ResolveSourcePackViewmodels();
 
             primaryAmmoInMagazine = weapon.AmmoInMagazine;
@@ -189,21 +194,36 @@ namespace ProjectSun.FPS.Weapons
             SetViewmodelsActive(requestedSlot);
             weapon.ApplyRuntimeLoadout(selectedLoadout, targetAmmo);
             weapon.SetMuzzle(selectedViewmodel.Muzzle);
-            ConfigurePresentation(selectedViewmodel);
+            Transform aimAnchor = attachmentPresenter != null
+                ? attachmentPresenter.Apply(selectedLoadout, selectedViewmodel.VisualRoot, selectedViewmodel.AimAnchor)
+                : selectedViewmodel.AimAnchor;
+            ConfigurePresentation(selectedViewmodel, aimAnchor);
             return true;
         }
 
-        private void ConfigurePresentation(WeaponViewmodelSlot selectedViewmodel)
+        private void ConfigurePresentation(WeaponViewmodelSlot selectedViewmodel, Transform aimAnchor)
         {
             if (viewmodel == null || viewmodel.Rig == null) return;
             if (feedback != null) feedback.SnapToHipPose();
             viewmodel.Rig.ConfigureWeaponPresentation(selectedViewmodel.ArmsController, selectedViewmodel.WeaponAnimator,
                 selectedViewmodel.Muzzle,
-                selectedViewmodel.AimAnchor, selectedViewmodel.Magazine, selectedViewmodel.AdsProfile,
+                aimAnchor, selectedViewmodel.Magazine, selectedViewmodel.AdsProfile,
                 selectedViewmodel.PresentationProfile);
             if (feedback != null)
                 feedback.Configure(weapon, player, playerCamera, viewmodel.VisualRoot, selectedViewmodel.Muzzle,
-                    selectedViewmodel.AimAnchor, selectedViewmodel.AdsProfile, selectedViewmodel.PresentationProfile);
+                    aimAnchor, selectedViewmodel.AdsProfile, selectedViewmodel.PresentationProfile);
+        }
+
+        private void RefreshActiveAttachmentPresentation()
+        {
+            if (!initialized || matchLoadout == null) return;
+            WeaponLoadout activeLoadout = activeSlot == WeaponInventorySlot.Primary ? matchLoadout.Primary : matchLoadout.Secondary;
+            WeaponViewmodelSlot activeViewmodel = activeSlot == WeaponInventorySlot.Primary ? primaryViewmodel : secondaryViewmodel;
+            if (activeLoadout == null || !activeViewmodel.IsValid) return;
+            Transform aimAnchor = attachmentPresenter != null
+                ? attachmentPresenter.Apply(activeLoadout, activeViewmodel.VisualRoot, activeViewmodel.AimAnchor)
+                : activeViewmodel.AimAnchor;
+            ConfigurePresentation(activeViewmodel, aimAnchor);
         }
 
         private void SetViewmodelsActive(WeaponInventorySlot selectedSlot)
@@ -272,6 +292,11 @@ namespace ProjectSun.FPS.Weapons
             foreach (Transform candidate in root.GetComponentsInChildren<Transform>(true))
                 if (candidate.name == objectName) return candidate;
             return null;
+        }
+
+        private void OnDestroy()
+        {
+            if (matchLoadout != null) matchLoadout.Changed -= RefreshActiveAttachmentPresentation;
         }
     }
 }

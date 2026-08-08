@@ -122,6 +122,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   respawnDelay: 2.5
+  idleYawDegreesPerSecond: 24
 --- !u!114 &1672241905190115614
 MonoBehaviour:
   m_ObjectHideFlags: 0

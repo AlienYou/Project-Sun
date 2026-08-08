@@ -11,9 +11,10 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6a1bcf897b4f48aca48931344305607b, type: 3}
   m_Name: S1SensorMine
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   displayName: S-1 SENSOR MINE
-  description: Deploys an armed proximity mine that detonates when an enemy enters its trigger radius.
+  description: Deploys an armed proximity mine that detonates when an enemy enters
+    its trigger radius.
   type: 1
   cooldownSeconds: 12
   maxCharges: 1
@@ -23,3 +24,6 @@ MonoBehaviour:
   blastRadius: 4
   damage: 120
   lifetimeSeconds: 90
+  throwSpeed: 15
+  throwUpwardSpeed: 2.2
+  fuseSeconds: 2.5

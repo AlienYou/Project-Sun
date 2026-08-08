@@ -33,6 +33,8 @@ namespace ProjectSun.FPS.Editor
                 WeaponInventoryController inventory = prefabRoot.GetComponent<WeaponInventoryController>();
                 if (inventory == null)
                     inventory = prefabRoot.AddComponent<WeaponInventoryController>();
+                if (prefabRoot.GetComponent<WeaponAttachmentViewmodelPresenter>() == null)
+                    prefabRoot.AddComponent<WeaponAttachmentViewmodelPresenter>();
 
                 inventory.ConfigureViewmodelReferences(prefabRoot.GetComponent<LowPolyShooterViewmodel>());
                 AssignDedicatedAimAnchors(prefabRoot, inventory);
@@ -136,7 +138,8 @@ namespace ProjectSun.FPS.Editor
                 Transform hg3Aim = FindDescendant(hg3, "AimAnchor_HG3");
                 Transform ar4Muzzle = FindDescendant(ar4, "SOCKET_Muzzle");
                 Transform hg3Muzzle = FindDescendant(hg3, "SOCKET_Muzzle");
-                if (ar4Aim == null || hg3Aim == null || ar4Muzzle == null || hg3Muzzle == null)
+                Transform ar4DefaultScope = FindDescendant(ar4, "SM_AR_01_Scope_Default");
+                if (ar4Aim == null || hg3Aim == null || ar4Muzzle == null || hg3Muzzle == null || ar4DefaultScope == null)
                 {
                     Debug.LogError("The owned first-person viewmodel is missing the anchors required to seed its Clip Probe contract.");
                     return false;
@@ -145,7 +148,10 @@ namespace ProjectSun.FPS.Editor
                 bool changed = false;
                 // The sight probe is intentionally larger than a point: it represents the visible sight/optic housing.
                 // Future optics carry their own probes and are collected automatically when active below this weapon root.
-                changed |= EnsureClipProbe(ar4Aim, "ClipProbe_AR4_SightHousing", "AR-4 Sight Housing", 0.026f);
+                // The default-sight probe is owned by its visible mesh. An optic replacement hides that mesh, so the
+                // obsolete default-sight constraint must not be validated together with the attachment's own probe.
+                changed |= EnsureClipProbe(ar4Aim, "ClipProbe_AR4_SightHousing", "AR-4 Sight Housing", 0.026f,
+                    ar4DefaultScope.gameObject);
                 changed |= EnsureClipProbe(ar4Muzzle, "ClipProbe_AR4_Muzzle", "AR-4 Muzzle", 0.012f);
                 changed |= EnsureClipProbe(hg3Aim, "ClipProbe_HG3_SightHousing", "HG-3 Sight Housing", 0.020f);
                 changed |= EnsureClipProbe(hg3Muzzle, "ClipProbe_HG3_Muzzle", "HG-3 Muzzle", 0.010f);
@@ -183,19 +189,30 @@ namespace ProjectSun.FPS.Editor
             return true;
         }
 
-        private static bool EnsureClipProbe(Transform parent, string probeName, string label, float radius)
+        private static bool EnsureClipProbe(Transform parent, string probeName, string label, float radius,
+            GameObject visibilityOwner = null)
         {
             Transform existing = FindDescendant(parent, probeName);
-            if (existing != null) return false;
+            ViewmodelClipProbe probe;
+            if (existing == null)
+            {
+                GameObject probeObject = new GameObject(probeName);
+                probeObject.layer = parent.gameObject.layer;
+                probeObject.transform.SetParent(parent, false);
+                probeObject.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+                probeObject.transform.localScale = Vector3.one;
+                probe = probeObject.AddComponent<ViewmodelClipProbe>();
+            }
+            else
+            {
+                probe = existing.GetComponent<ViewmodelClipProbe>();
+                if (probe == null) probe = existing.gameObject.AddComponent<ViewmodelClipProbe>();
+            }
 
-            GameObject probeObject = new GameObject(probeName);
-            probeObject.layer = parent.gameObject.layer;
-            probeObject.transform.SetParent(parent, false);
-            probeObject.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
-            probeObject.transform.localScale = Vector3.one;
-            ViewmodelClipProbe probe = probeObject.AddComponent<ViewmodelClipProbe>();
-            probe.Configure(label, radius);
-            return true;
+            bool changed = probe.ValidationLabel != label || Mathf.Abs(probe.SurfaceRadius - radius) > 0.0001f ||
+                probe.VisibilityOwner != visibilityOwner;
+            if (changed) probe.Configure(label, radius, visibilityOwner);
+            return changed;
         }
 
         private static void AssignDedicatedAimAnchors(GameObject player, WeaponInventoryController inventory)

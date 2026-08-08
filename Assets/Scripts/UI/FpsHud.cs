@@ -76,6 +76,7 @@ namespace ProjectSun.FPS.UI
 
             if (!hideCrosshairWhileAiming || !weapon.IsAiming)
                 DrawCrosshair(width, height);
+            if (weapon.IsAiming) DrawActiveOpticReticle(width, height);
             if (Time.time < hitMarkerUntil)
                 GUI.Label(new Rect(width * 0.5f - 15f, height * 0.5f - 20f, 30f, 36f), "X", largeTextStyle);
             if (Time.time < damageWarningUntil)
@@ -115,6 +116,13 @@ namespace ProjectSun.FPS.UI
             GUI.color = oldColor;
         }
 
+        private void DrawActiveOpticReticle(float width, float height)
+        {
+            WeaponAttachment optic = weapon.Loadout != null ? weapon.Loadout.GetEquipped(AttachmentSlot.Optic) : null;
+            if (optic == null || optic.OpticSightProfile == null) return;
+            OpticReticleGui.Draw(optic.OpticSightProfile, new Rect(0f, 0f, width, height));
+        }
+
         private void EnsureStyles()
         {
             if (textStyle != null) return;
@@ -137,5 +145,61 @@ namespace ProjectSun.FPS.UI
             if (active) return "ACTIVE";
             return seconds <= 0f ? "READY" : $"{seconds:0.0}s";
         }
+    }
+
+    /// <summary>Shared immediate-mode fallback renderer for runtime HUD and editor workbench optic previews.</summary>
+    public static class OpticReticleGui
+    {
+        public static void Draw(OpticSightProfile profile, Rect viewport)
+        {
+            if (profile == null || !profile.HasReticle || viewport.width <= 0f || viewport.height <= 0f) return;
+            Color originalColor = GUI.color;
+            GUI.color = profile.ReticleColor;
+            if (profile.ReticleTexture != null)
+            {
+                float side = Mathf.Min(profile.FrameSizePixels, Mathf.Min(viewport.width, viewport.height));
+                GUI.DrawTexture(new Rect(viewport.center.x - side * 0.5f, viewport.center.y - side * 0.5f, side, side),
+                    profile.ReticleTexture, ScaleMode.ScaleToFit, true);
+            }
+            else
+            {
+                DrawFallback(profile, viewport.center);
+            }
+            GUI.color = originalColor;
+        }
+
+        private static void DrawFallback(OpticSightProfile profile, Vector2 centre)
+        {
+            float thickness = Mathf.Max(1f, profile.ReticleSizePixels * 0.32f);
+            switch (profile.FallbackReticleStyle)
+            {
+                case OpticReticleStyle.Dot:
+                    DrawSquare(centre, profile.ReticleSizePixels);
+                    break;
+                case OpticReticleStyle.RingDot:
+                    float half = profile.FrameSizePixels * 0.5f;
+                    DrawLine(new Rect(centre.x - half, centre.y - half, profile.FrameSizePixels, thickness));
+                    DrawLine(new Rect(centre.x - half, centre.y + half - thickness, profile.FrameSizePixels, thickness));
+                    DrawLine(new Rect(centre.x - half, centre.y - half, thickness, profile.FrameSizePixels));
+                    DrawLine(new Rect(centre.x + half - thickness, centre.y - half, thickness, profile.FrameSizePixels));
+                    DrawSquare(centre, profile.ReticleSizePixels);
+                    break;
+                case OpticReticleStyle.Cross:
+                    float length = profile.FrameSizePixels * 0.5f;
+                    float gap = Mathf.Max(2f, profile.ReticleSizePixels * 0.75f);
+                    DrawLine(new Rect(centre.x - length, centre.y - thickness * 0.5f, length - gap, thickness));
+                    DrawLine(new Rect(centre.x + gap, centre.y - thickness * 0.5f, length - gap, thickness));
+                    DrawLine(new Rect(centre.x - thickness * 0.5f, centre.y - length, thickness, length - gap));
+                    DrawLine(new Rect(centre.x - thickness * 0.5f, centre.y + gap, thickness, length - gap));
+                    break;
+            }
+        }
+
+        private static void DrawSquare(Vector2 centre, float side)
+        {
+            GUI.DrawTexture(new Rect(centre.x - side * 0.5f, centre.y - side * 0.5f, side, side), Texture2D.whiteTexture);
+        }
+
+        private static void DrawLine(Rect rect) => GUI.DrawTexture(rect, Texture2D.whiteTexture);
     }
 }

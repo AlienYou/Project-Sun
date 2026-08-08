@@ -335,6 +335,7 @@ MonoBehaviour:
   validationLabel: AR-4 Muzzle
   surfaceRadius: 0.012
   participatesInValidation: 1
+  visibilityOwner: {fileID: 0}
 --- !u!1 &999929587431458947
 GameObject:
   m_ObjectHideFlags: 0
@@ -2628,6 +2629,7 @@ MonoBehaviour:
   validationLabel: AR-4 Sight Housing
   surfaceRadius: 0.026
   participatesInValidation: 1
+  visibilityOwner: {fileID: 1753217128748830079}
 --- !u!1 &5964037640663786173
 GameObject:
   m_ObjectHideFlags: 0
@@ -2925,6 +2927,7 @@ MonoBehaviour:
   validationLabel: HG-3 Muzzle
   surfaceRadius: 0.01
   participatesInValidation: 1
+  visibilityOwner: {fileID: 0}
 --- !u!1 &6364982909927209909
 GameObject:
   m_ObjectHideFlags: 0
@@ -3890,6 +3893,7 @@ MonoBehaviour:
   validationLabel: HG-3 Sight Housing
   surfaceRadius: 0.02
   participatesInValidation: 1
+  visibilityOwner: {fileID: 0}
 --- !u!1 &8341493601372005920
 GameObject:
   m_ObjectHideFlags: 0

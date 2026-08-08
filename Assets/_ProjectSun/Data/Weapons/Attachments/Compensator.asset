@@ -21,5 +21,16 @@ MonoBehaviour:
   hipSpreadMultiplier: 0.76
   aimSpreadMultiplier: 0.82
   rangeMultiplier: 1
+  adsProfileOverride: {fileID: 0}
+  hipCameraSpacePositionOffset: {x: 0, y: 0, z: 0}
+  hipCameraSpaceRotationOffset: {x: 0, y: 0, z: 0}
+  viewKickMultiplier: 1
+  viewmodelVisuals:
+  - weapon: {fileID: 11400000, guid: 67abb993db0b8044b941d74fe5a3749b, type: 2}
+    prefab: {fileID: 5577617048107063773, guid: 1d89dd57c079b884e8511b7c1280d28a,
+      type: 3}
+    mountName: SOCKET_Muzzle
+    replacedBuiltInVisualName: 
+    aimAnchorName: 
   compatibleWeapons:
   - {fileID: 11400000, guid: 67abb993db0b8044b941d74fe5a3749b, type: 2}

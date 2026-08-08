@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30d16ce189642d14c8e3e69ed275c79b, type: 3}
+  m_Name: SRScope00
+  m_EditorClassIdentifier: 
+  slot: 0
+  displayName: SR SCOPE 00
+  damageMultiplier: 1
+  fireRateMultiplier: 1
+  magazineMultiplier: 1
+  reloadMultiplier: 1
+  hipSpreadMultiplier: 1.08
+  aimSpreadMultiplier: 0.42
+  rangeMultiplier: 1
+  adsProfileOverride: {fileID: 11400000, guid: 18abd99ff78c758488132359f835f70b, type: 2}
+  opticSightProfile: {fileID: 11400000, guid: 7a55a3f7d20b69d47bcc457058cde34a, type: 2}
+  hipCameraSpacePositionOffset: {x: 0, y: 0, z: 0}
+  hipCameraSpaceRotationOffset: {x: 0, y: 0, z: 0}
+  viewKickMultiplier: 1
+  viewmodelVisuals:
+  - weapon: {fileID: 11400000, guid: 67abb993db0b8044b941d74fe5a3749b, type: 2}
+    prefab: {fileID: 3555087648350930006, guid: d129e34d9523c0f4fade2b3d50f661b9,
+      type: 3}
+    mountName: SOCKET_Scope
+    replacedBuiltInVisualName: SM_AR_01_Scope_Default
+    aimAnchorName: AimAnchor_SRScope00
+  compatibleWeapons:
+  - {fileID: 11400000, guid: 67abb993db0b8044b941d74fe5a3749b, type: 2}

@@ -21,5 +21,10 @@ MonoBehaviour:
   hipSpreadMultiplier: 0.86
   aimSpreadMultiplier: 1
   rangeMultiplier: 0.76
+  adsProfileOverride: {fileID: 0}
+  hipCameraSpacePositionOffset: {x: 0, y: 0, z: 0}
+  hipCameraSpaceRotationOffset: {x: 0, y: 0, z: 0}
+  viewKickMultiplier: 1
+  viewmodelVisuals: []
   compatibleWeapons:
   - {fileID: 11400000, guid: 67abb993db0b8044b941d74fe5a3749b, type: 2}

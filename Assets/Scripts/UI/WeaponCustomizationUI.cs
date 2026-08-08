@@ -208,7 +208,10 @@ namespace ProjectSun.FPS.UI
             {
                 if (option.slot != slot || !IsAttachmentAvailable(targetWeapon, option)) continue;
                 hasCompatibleOption = true;
-                if (GUI.Button(new Rect(x, area.y + 29f, 132f, 30f), option.displayName))
+                string presentationState = option.TryGetViewmodelVisual(targetWeapon, out _)
+                    ? "VIEWMODEL READY"
+                    : "STAT ONLY";
+                if (GUI.Button(new Rect(x, area.y + 29f, 132f, 30f), $"{option.displayName}\n{presentationState}"))
                 {
                     if (matchLoadout != null) matchLoadout.TryEquip(attachmentTargetSlot, option);
                     else weapon.TryEquip(option);

@@ -21,5 +21,17 @@ MonoBehaviour:
   hipSpreadMultiplier: 1
   aimSpreadMultiplier: 0.55
   rangeMultiplier: 1
+  adsProfileOverride: {fileID: 11400000, guid: 18f3e5197bd442f4c9d75ad48b4361eb, type: 2}
+  opticSightProfile: {fileID: 11400000, guid: 46b714f1b5a488347844e50fe4f14b4a, type: 2}
+  hipCameraSpacePositionOffset: {x: 0, y: 0, z: 0}
+  hipCameraSpaceRotationOffset: {x: 0, y: 0, z: 0}
+  viewKickMultiplier: 1
+  viewmodelVisuals:
+  - weapon: {fileID: 11400000, guid: 67abb993db0b8044b941d74fe5a3749b, type: 2}
+    prefab: {fileID: 2927725581302590801, guid: 56a92c5d2b812dd43a02e7ae9f00b921,
+      type: 3}
+    mountName: SOCKET_Scope
+    replacedBuiltInVisualName: SM_AR_01_Scope_Default
+    aimAnchorName: AimAnchor_M2Reflex
   compatibleWeapons:
   - {fileID: 11400000, guid: 67abb993db0b8044b941d74fe5a3749b, type: 2}

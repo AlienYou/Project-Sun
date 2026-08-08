@@ -71,6 +71,8 @@ namespace ProjectSun.FPS.Editor
             {
                 CreateAttachment("M2Reflex", AttachmentSlot.Optic, "M2 REFLEX", aimSpread: 0.55f),
                 CreateAttachment("H7Holo", AttachmentSlot.Optic, "H7 HOLO", hipSpread: 0.9f, aimSpread: 0.72f),
+                CreateAttachment("SRScope00", AttachmentSlot.Optic, "SR SCOPE 00", hipSpread: 1.08f, aimSpread: 0.42f),
+                CreateAttachment("TanLrScope01", AttachmentSlot.Optic, "TAN LR SCOPE 01", hipSpread: 1.12f, aimSpread: 0.38f),
                 CreateAttachment("Compensator", AttachmentSlot.Muzzle, "COMPENSATOR", hipSpread: 0.76f, aimSpread: 0.82f),
                 CreateAttachment("Suppressor", AttachmentSlot.Muzzle, "SUPPRESSOR", range: 0.84f, hipSpread: 0.9f),
                 CreateAttachment("LongBarrel", AttachmentSlot.Barrel, "LONG BARREL", damage: 1.06f, range: 1.25f, fireRate: 0.94f),

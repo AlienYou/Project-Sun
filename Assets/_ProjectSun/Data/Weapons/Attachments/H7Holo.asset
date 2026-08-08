@@ -21,5 +21,16 @@ MonoBehaviour:
   hipSpreadMultiplier: 0.9
   aimSpreadMultiplier: 0.72
   rangeMultiplier: 1
+  adsProfileOverride: {fileID: 11400000, guid: e64f9149f4b9a8a4cae39c854c2a0780, type: 2}
+  opticSightProfile: {fileID: 11400000, guid: 2b94577b84880094c8d3e3f90cc63f67, type: 2}
+  hipCameraSpacePositionOffset: {x: 0, y: 0, z: 0}
+  hipCameraSpaceRotationOffset: {x: 0, y: 0, z: 0}
+  viewKickMultiplier: 1
+  viewmodelVisuals:
+  - weapon: {fileID: 11400000, guid: 67abb993db0b8044b941d74fe5a3749b, type: 2}
+    prefab: {fileID: 579900867650177990, guid: a891e1a64ae7dac4696b4d6ea2e96aca, type: 3}
+    mountName: SOCKET_Scope
+    replacedBuiltInVisualName: SM_AR_01_Scope_Default
+    aimAnchorName: AimAnchor_H7Holo
   compatibleWeapons:
   - {fileID: 11400000, guid: 67abb993db0b8044b941d74fe5a3749b, type: 2}
