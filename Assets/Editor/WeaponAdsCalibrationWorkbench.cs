@@ -18,10 +18,36 @@ namespace ProjectSun.FPS.Editor
         private const string PlayerPrefabPath = "Assets/_ProjectSun/Prefabs/Characters/Player.prefab";
         private const string LoadoutCatalogPath = "Assets/_ProjectSun/Data/Weapons/Catalogs/AR4LoadoutCatalog.asset";
         private const float ScreenTolerancePixels = 2f;
+        private const float LensCentreToleranceViewport = 0.015f;
+        private const float LensAxisToleranceDegrees = 3f;
+        private const float LensMinimumViewportDiameter = 0.02f;
+        private const float LensMaximumViewportDiameter = 0.95f;
         private const double AttachmentPrefabAutosaveDelaySeconds = 0.45d;
 
         private enum PreviewMode { Hip, Ads, Compare }
-        private enum AttachmentSceneEditMode { None, ModelPosition, ModelRotation, AimAnchorPosition, AimAnchorRotation }
+        private enum AttachmentSceneEditMode
+        {
+            None,
+            ModelPosition,
+            ModelRotation,
+            AimAnchorPosition,
+            AimAnchorRotation,
+            LensPosition,
+            LensRotation,
+            LensAperture
+        }
+
+        private static readonly string[] AttachmentSceneEditLabels =
+        {
+            "关闭",
+            "移动附件整体",
+            "旋转附件整体",
+            "移动 ADS 瞄准基准",
+            "旋转 ADS 光轴",
+            "移动 LensAnchor",
+            "旋转镜片平面",
+            "调整镜片有效口径"
+        };
 
         [SerializeField] private WeaponInventorySlot selectedSlot = WeaponInventorySlot.Primary;
         [SerializeField] private WeaponAttachment selectedOptic;
@@ -30,6 +56,9 @@ namespace ProjectSun.FPS.Editor
         [SerializeField] private bool showHipPresentation = true;
         [SerializeField] private bool showAdsConfiguration = true;
         [SerializeField] private bool showAttachmentGeometryRepair;
+        [SerializeField] private bool showScopeLensCalibration = true;
+        [SerializeField] private bool showScopeLensValidationDetails = true;
+        [SerializeField] private bool showScopeLensGuides = true;
         [SerializeField] private PreviewMode previewMode = PreviewMode.Compare;
         [SerializeField] private Vector2 scrollPosition;
         [SerializeField] private bool freezeAnimationForCalibration;
@@ -81,6 +110,8 @@ namespace ProjectSun.FPS.Editor
         private bool attachmentPrefabSavePending;
         private double attachmentPrefabAutosaveAt;
         private int attachmentSceneUndoGroup = -1;
+        private bool attachmentSceneDragActive;
+        private AttachmentSceneEditMode attachmentSceneDragMode = AttachmentSceneEditMode.None;
 
         // Isolated runtime-camera preview. It is never saved into the Player prefab.
         private GameObject cameraPreviewPlayer;
@@ -129,6 +160,32 @@ namespace ProjectSun.FPS.Editor
             }
         }
 
+        private readonly struct ScopeLensMeasurement
+        {
+            public readonly ViewmodelScopeLens Lens;
+            public readonly Vector3 ViewportCentre;
+            public readonly float ViewportDiameter;
+            public readonly float CentreError;
+            public readonly float CameraAxisError;
+            public readonly float SightAxisError;
+            public readonly bool HasSightAxisMeasurement;
+            public readonly bool IsInFrontOfCamera;
+
+            public ScopeLensMeasurement(ViewmodelScopeLens lens, Vector3 viewportCentre, float viewportDiameter,
+                float centreError, float cameraAxisError, float sightAxisError, bool hasSightAxisMeasurement,
+                bool isInFrontOfCamera)
+            {
+                Lens = lens;
+                ViewportCentre = viewportCentre;
+                ViewportDiameter = viewportDiameter;
+                CentreError = centreError;
+                CameraAxisError = cameraAxisError;
+                SightAxisError = sightAxisError;
+                HasSightAxisMeasurement = hasSightAxisMeasurement;
+                IsInFrontOfCamera = isInFrontOfCamera;
+            }
+        }
+
         [MenuItem("Project Sun/Tools/Weapon Presentation Workbench", priority = 40)]
         [MenuItem("Project Sun/Tools/ADS Calibration Workbench", priority = 41)]
         public static void Open()
@@ -157,6 +214,8 @@ namespace ProjectSun.FPS.Editor
                 Undo.CollapseUndoOperations(attachmentSceneUndoGroup);
                 attachmentSceneUndoGroup = -1;
             }
+            attachmentSceneDragActive = false;
+            attachmentSceneDragMode = AttachmentSceneEditMode.None;
             StopPreview();
             ReleaseAttachmentPrefabContents();
         }
@@ -362,28 +421,41 @@ namespace ProjectSun.FPS.Editor
                 string.IsNullOrWhiteSpace(loadedAttachmentPrefabPath)) return;
 
             SaveAttachmentPrefabContentsNow(true);
+            SynchronizeLoadedAttachmentPrefabToLivePreviews();
+            Repaint();
+        }
 
+        private void SynchronizeLoadedAttachmentPrefabToLivePreviews()
+        {
+            if (!previewActive || loadedAttachmentPrefabContents == null || loadedAttachmentVisual == null) return;
             Transform aimAnchor = FindDescendant(loadedAttachmentPrefabContents.transform,
                 loadedAttachmentVisual.AimAnchorName);
             Transform calibrationTarget = FindAttachmentCalibrationTransform(loadedAttachmentPrefabContents.transform);
+            ViewmodelScopeLens scopeLens = FindScopeLens(loadedAttachmentPrefabContents.transform);
             AdsSightReference sightReference = aimAnchor != null ? aimAnchor.GetComponent<AdsSightReference>() : null;
-            if (previewActive && aimAnchor != null)
+            if (aimAnchor != null)
                 ApplyAttachmentPrefabEditsToLivePreviews(loadedAttachmentVisual, true, aimAnchor.localPosition,
                     aimAnchor.localEulerAngles, sightReference != null && sightReference.OrientationAuthored,
                     calibrationTarget != null, calibrationTarget != null ? calibrationTarget.localPosition : Vector3.zero,
                     calibrationTarget != null ? calibrationTarget.localEulerAngles : Vector3.zero,
                     calibrationTarget != null ? calibrationTarget.localScale : Vector3.one);
-            Repaint();
+            if (scopeLens != null)
+                ApplyScopeLensPrefabEditsToLivePreviews(loadedAttachmentVisual, scopeLens.transform.localPosition,
+                    scopeLens.transform.localEulerAngles, scopeLens.ClearApertureDiameter,
+                    scopeLens.OrientationAuthored, scopeLens.VisualPlacementReviewed);
         }
 
         private void DrawAttachmentSceneEditControls()
         {
             EditorGUILayout.LabelField("Scene 直接编辑", EditorStyles.miniBoldLabel);
-            attachmentSceneEditMode = (AttachmentSceneEditMode)GUILayout.Toolbar((int)attachmentSceneEditMode,
-                new[] { "关闭", "移整体", "转整体", "移 ADS 基准", "转 ADS 光轴" });
+            attachmentSceneEditMode = (AttachmentSceneEditMode)EditorGUILayout.Popup("编辑对象",
+                (int)attachmentSceneEditMode, AttachmentSceneEditLabels);
+            if (attachmentSceneDragActive)
+                EditorGUILayout.LabelField($"正在拖拽：{AttachmentSceneEditLabels[(int)attachmentSceneDragMode]}；松开鼠标后统一保存。",
+                    EditorStyles.miniLabel);
             if (attachmentSceneEditMode == AttachmentSceneEditMode.None) return;
             EditorGUILayout.HelpBox(previewActive
-                    ? "切到 Scene 视图，拖拽当前显示的彩色手柄即可直接校准。整体挂载用蓝/绿色，ADS 瞄准基准与光轴用黄色；松开鼠标后可用 Ctrl+Z 撤销整次拖拽。"
+                    ? "切到 Scene 视图，拖拽当前显示的彩色手柄即可直接校准。整体挂载用蓝/绿色，ADS 基准用黄色，LensAnchor 与口径用青色；松开鼠标后可用 Ctrl+Z 撤销整次拖拽。"
                     : "启动实时武器预览后，Scene 视图才会显示所选附件的直接编辑手柄。",
                 MessageType.None);
         }
@@ -407,6 +479,7 @@ namespace ProjectSun.FPS.Editor
 
         private void FlushDeferredAttachmentPrefabSave()
         {
+            if (attachmentSceneDragActive) return;
             if (attachmentPrefabSavePending && EditorApplication.timeSinceStartup >= attachmentPrefabAutosaveAt)
                 SaveAttachmentPrefabContentsNow();
         }
@@ -484,9 +557,167 @@ namespace ProjectSun.FPS.Editor
                     MessageType.Warning);
             }
 
-            if (!anchorChanged && !modelChanged) return;
-            ApplyAttachmentPrefabAssetEdits(visual, aimAnchor, calibrationTarget, anchorChanged, newAnchorPosition,
-                newAnchorRotation, orientationAuthored, modelChanged, newModelPosition, newModelRotation, newModelScale);
+            if (anchorChanged || modelChanged)
+                ApplyAttachmentPrefabAssetEdits(visual, aimAnchor, calibrationTarget, anchorChanged, newAnchorPosition,
+                    newAnchorRotation, orientationAuthored, modelChanged, newModelPosition, newModelRotation,
+                    newModelScale);
+
+            DrawScopeLensPrefabEditor(visual, prefabContents.transform, aimAnchor);
+        }
+
+        private void DrawScopeLensPrefabEditor(WeaponAttachmentViewmodelVisual visual, Transform prefabRoot,
+            Transform aimAnchor)
+        {
+            OpticSightProfile opticProfile = selectedOptic != null ? selectedOptic.OpticSightProfile : null;
+            bool requiresMagnifiedLens = opticProfile != null && opticProfile.UsesMagnifiedLensRendering;
+            ViewmodelScopeLens[] scopeLenses = prefabRoot != null
+                ? prefabRoot.GetComponentsInChildren<ViewmodelScopeLens>(true)
+                : new ViewmodelScopeLens[0];
+            if (!requiresMagnifiedLens && scopeLenses.Length == 0) return;
+
+            EditorGUILayout.Space(5f);
+            showScopeLensCalibration = EditorGUILayout.Foldout(showScopeLensCalibration,
+                "倍率镜 LensAnchor 校准与验收", true, EditorStyles.foldoutHeader);
+            if (!showScopeLensCalibration) return;
+
+            if (!requiresMagnifiedLens)
+            {
+                EditorGUILayout.HelpBox(
+                    "当前瞄具不是倍率镜，却包含 ViewmodelScopeLens。该组件不会在运行时启用；若这是红点或全息瞄具，应移除镜片组件。",
+                    MessageType.Warning);
+                return;
+            }
+            if (scopeLenses.Length == 0)
+            {
+                EditorGUILayout.HelpBox(
+                    "倍率镜预制体缺少 ViewmodelScopeLens。请通过资源准备工具创建 LensAnchor；不要用 AimAnchor 代替物理镜片。",
+                    MessageType.Error);
+                return;
+            }
+            if (scopeLenses.Length > 1)
+            {
+                EditorGUILayout.HelpBox($"检测到 {scopeLenses.Length} 个 ViewmodelScopeLens；每个倍率镜只允许一个物理后镜片契约。",
+                    MessageType.Error);
+                return;
+            }
+
+            ViewmodelScopeLens scopeLens = scopeLenses[0];
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.ObjectField("LensAnchor", scopeLens, typeof(ViewmodelScopeLens), true);
+
+            EditorGUI.BeginChangeCheck();
+            Vector3 newPosition = EditorGUILayout.Vector3Field("镜片中心位置", scopeLens.transform.localPosition);
+            Vector3 newRotation = EditorGUILayout.Vector3Field("镜片平面旋转", scopeLens.transform.localEulerAngles);
+            float apertureMillimetres = EditorGUILayout.Slider("有效口径（mm）",
+                scopeLens.ClearApertureDiameter * 1000f, 5f, 150f);
+            bool orientationAuthored = EditorGUILayout.Toggle("使用已制作镜片平面",
+                scopeLens.OrientationAuthored);
+            bool changed = EditorGUI.EndChangeCheck();
+            if (changed)
+                ApplyScopeLensPrefabAssetEdits(visual, scopeLens, newPosition, newRotation,
+                    apertureMillimetres / 1000f, orientationAuthored, false);
+
+            EditorGUILayout.LabelField(
+                "LensAnchor 只定义后镜片中心、平面方向与有效口径；它不会改变 ADS 姿态或弹道。本地 +Z 指向目标，本地 +Y 为瞄具上方。",
+                EditorStyles.wordWrappedMiniLabel);
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                using (new EditorGUI.DisabledScope(!previewActive))
+                    if (GUILayout.Button("按当前 ADS 视角播种镜片平面"))
+                    {
+                        SeedScopeLensOrientation(visual, scopeLens);
+                        return;
+                    }
+                if (GUILayout.Button("选择 LensAnchor")) Selection.activeObject = scopeLens.gameObject;
+            }
+
+            showScopeLensGuides = EditorGUILayout.Toggle("在预览与 Scene 显示镜片边界", showScopeLensGuides);
+            DrawNudgeStepControls("每次 LensAnchor 微调（mm）");
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.FlexibleSpace();
+                using (new EditorGUI.DisabledScope(!previewActive))
+                    if (GUILayout.Button("镜片上移", GUILayout.Width(100f)))
+                        NudgeScopeLens(visual, previewCamera.transform.up);
+                GUILayout.FlexibleSpace();
+            }
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                using (new EditorGUI.DisabledScope(!previewActive))
+                {
+                    if (GUILayout.Button("镜片左移")) NudgeScopeLens(visual, -previewCamera.transform.right);
+                    if (GUILayout.Button("镜片右移")) NudgeScopeLens(visual, previewCamera.transform.right);
+                }
+            }
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.FlexibleSpace();
+                using (new EditorGUI.DisabledScope(!previewActive))
+                    if (GUILayout.Button("镜片下移", GUILayout.Width(100f)))
+                        NudgeScopeLens(visual, -previewCamera.transform.up);
+                GUILayout.FlexibleSpace();
+            }
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                using (new EditorGUI.DisabledScope(!previewActive))
+                {
+                    if (GUILayout.Button("镜片后移")) NudgeScopeLens(visual, -previewCamera.transform.forward);
+                    if (GUILayout.Button("镜片前移")) NudgeScopeLens(visual, previewCamera.transform.forward);
+                }
+            }
+
+            bool canReview = DrawScopeLensContractValidation(prefabRoot, aimAnchor, scopeLens);
+            using (new EditorGUI.DisabledScope(!canReview))
+                if (GUILayout.Button(scopeLens.VisualPlacementReviewed
+                        ? "镜片视觉覆盖已确认（再次点击可重新确认）"
+                        : "确认镜片边界覆盖真实后镜片"))
+                    ApplyScopeLensPrefabAssetEdits(visual, scopeLens, scopeLens.transform.localPosition,
+                        scopeLens.transform.localEulerAngles, scopeLens.ClearApertureDiameter,
+                        scopeLens.OrientationAuthored, true, -1, "确认倍率镜镜片视觉覆盖");
+        }
+
+        private void SeedScopeLensOrientation(WeaponAttachmentViewmodelVisual visual, ViewmodelScopeLens assetLens)
+        {
+            if (!previewActive || adsPreviewCamera == null || assetLens == null ||
+                !TryGetLiveAttachmentRoot(adsPreviewRig, out Transform attachmentRoot)) return;
+            ViewmodelScopeLens liveLens = FindScopeLens(attachmentRoot);
+            if (liveLens == null || liveLens.transform.parent == null) return;
+
+            Quaternion localRotation = Quaternion.Inverse(liveLens.transform.parent.rotation) *
+                adsPreviewCamera.transform.rotation;
+            ApplyScopeLensPrefabAssetEdits(visual, assetLens, assetLens.transform.localPosition,
+                localRotation.eulerAngles, assetLens.ClearApertureDiameter, true, false, -1,
+                "播种倍率镜镜片平面");
+        }
+
+        private void ApplyScopeLensPrefabAssetEdits(WeaponAttachmentViewmodelVisual visual,
+            ViewmodelScopeLens scopeLens, Vector3 newPosition, Vector3 newRotation, float newDiameter,
+            bool orientationAuthored, bool visualReviewed, int undoGroup = -1,
+            string undoName = "校准倍率镜 LensAnchor")
+        {
+            if (visual == null || scopeLens == null) return;
+            bool ownsUndoGroup = undoGroup < 0;
+            if (ownsUndoGroup)
+            {
+                Undo.IncrementCurrentGroup();
+                undoGroup = Undo.GetCurrentGroup();
+                Undo.SetCurrentGroupName(undoName);
+            }
+
+            Undo.RecordObject(scopeLens.transform, undoName);
+            Undo.RecordObject(scopeLens, undoName);
+            scopeLens.transform.localPosition = newPosition;
+            scopeLens.transform.localEulerAngles = newRotation;
+            scopeLens.Configure(newDiameter);
+            scopeLens.SetOrientationAuthored(orientationAuthored);
+            scopeLens.SetVisualPlacementReviewed(visualReviewed);
+            EditorUtility.SetDirty(scopeLens);
+            ScheduleAttachmentPrefabSave();
+            if (ownsUndoGroup) Undo.CollapseUndoOperations(undoGroup);
+            if (previewActive)
+                ApplyScopeLensPrefabEditsToLivePreviews(visual, newPosition, newRotation, newDiameter,
+                    orientationAuthored, visualReviewed);
         }
 
         private void SeedAuthoredSightOrientation(WeaponAttachmentViewmodelVisual visual, Transform assetAimAnchor,
@@ -554,8 +785,11 @@ namespace ProjectSun.FPS.Editor
                     orientationAuthored, modelChanged, newModelPosition, newModelRotation, newModelScale);
         }
 
-        private static string GetAttachmentEditUndoName(bool anchorChanged, bool modelChanged) =>
-            anchorChanged && modelChanged
+        private static string GetAttachmentEditUndoName(bool anchorChanged, bool modelChanged,
+            bool lensChanged = false) =>
+            lensChanged
+                ? "校准倍率镜 LensAnchor"
+                : anchorChanged && modelChanged
                 ? "校准附件模型与 ADS 瞄准基准"
                 : anchorChanged ? "校准附件 ADS 瞄准基准" : "调整附件模型挂载";
 
@@ -992,6 +1226,181 @@ namespace ProjectSun.FPS.Editor
             }
         }
 
+        private bool DrawScopeLensContractValidation(Transform prefabRoot, Transform assetAimAnchor,
+            ViewmodelScopeLens assetLens)
+        {
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField("倍率镜镜片契约", EditorStyles.boldLabel);
+
+            OpticSightProfile opticProfile = selectedOptic != null ? selectedOptic.OpticSightProfile : null;
+            bool profileValid = opticProfile != null && opticProfile.UsesMagnifiedLensRendering;
+            int lensCount = prefabRoot != null
+                ? prefabRoot.GetComponentsInChildren<ViewmodelScopeLens>(true).Length
+                : 0;
+            ViewmodelAttachmentCalibrationRoot lensCalibrationRoot = assetLens != null
+                ? assetLens.GetComponentInParent<ViewmodelAttachmentCalibrationRoot>()
+                : null;
+            ViewmodelAttachmentCalibrationRoot aimCalibrationRoot = assetAimAnchor != null
+                ? assetAimAnchor.GetComponentInParent<ViewmodelAttachmentCalibrationRoot>()
+                : null;
+            bool sharedCalibrationRoot = lensCalibrationRoot != null && lensCalibrationRoot == aimCalibrationRoot;
+            bool layerValid = assetLens != null && assetLens.gameObject.layer == CombatLayers.ViewmodelLayer;
+            bool measured = TryMeasureScopeLens(adsPreviewRig, adsPreviewCamera,
+                out ScopeLensMeasurement measurement);
+            bool measurementValid = measured && IsScopeLensMeasurementValid(measurement);
+            bool boundsMeasured = false;
+            float boundsDistance = float.PositiveInfinity;
+            bool insideAttachmentBounds = false;
+            if (measured && TryGetLiveAttachmentRoot(adsPreviewRig, out Transform liveAttachmentRoot) &&
+                TryGetRendererBounds(liveAttachmentRoot, out Bounds attachmentBounds))
+            {
+                boundsMeasured = true;
+                boundsDistance = Vector3.Distance(measurement.Lens.transform.position,
+                    attachmentBounds.ClosestPoint(measurement.Lens.transform.position));
+                Vector3 lensScale = measurement.Lens.transform.lossyScale;
+                float apertureScale = Mathf.Max(Mathf.Abs(lensScale.x), Mathf.Abs(lensScale.y));
+                float allowedDistance = Mathf.Max(0.01f,
+                    measurement.Lens.ClearApertureDiameter * apertureScale * 0.5f);
+                insideAttachmentBounds = boundsDistance <= allowedDistance;
+            }
+
+            bool automaticPass = profileValid && lensCount == 1 && sharedCalibrationRoot && layerValid &&
+                assetLens != null && assetLens.OrientationAuthored && measurementValid &&
+                (!boundsMeasured || insideAttachmentBounds);
+            bool ready = automaticPass && assetLens != null && assetLens.VisualPlacementReviewed;
+            string headline = ready
+                ? "READY：倍率镜镜片契约与人工视觉验收均已通过。"
+                : automaticPass
+                    ? "自动契约已通过；还需确认青色边界覆盖真实后镜片。"
+                    : "NOT READY：请按下方失败项处理，不要通过移动 AimAnchor 修复镜片。";
+            EditorGUILayout.HelpBox(headline, ready ? MessageType.Info : MessageType.Warning);
+
+            showScopeLensValidationDetails = EditorGUILayout.Foldout(showScopeLensValidationDetails,
+                "查看镜片验收明细", true);
+            if (!showScopeLensValidationDetails) return automaticPass;
+
+            string profileState = profileValid ? "通过" : "失败：OpticSightProfile 不是有效倍率镜";
+            string countState = lensCount == 1 ? "通过" : $"失败：检测到 {lensCount} 个镜片组件，要求恰好 1 个";
+            string rootState = sharedCalibrationRoot
+                ? "通过"
+                : "失败：AimAnchor 与 LensAnchor 未共享 AttachmentCalibrationRoot";
+            string authoredState = assetLens != null && assetLens.OrientationAuthored
+                ? "通过"
+                : "失败：点击“按当前 ADS 视角播种镜片平面”";
+            string layerState = layerValid
+                ? "通过"
+                : $"失败：LensAnchor 必须使用 Viewmodel Layer（{CombatLayers.ViewmodelLayer}）";
+            string liveState;
+            if (!measured)
+                liveState = "失败：启动 ADS/并排实时预览后才能测量";
+            else
+            {
+                string sightAxis = measurement.HasSightAxisMeasurement
+                    ? $"；与 ADS 光轴 {measurement.SightAxisError:0.00}°"
+                    : "；ADS 光轴尚处于兼容模式，暂不比较两条制作轴";
+                liveState =
+                    $"{(measurementValid ? "通过" : "失败")}：中心偏差 {measurement.CentreError * 100f:0.00}% " +
+                    $"/ 阈值 {LensCentreToleranceViewport * 100f:0.00}%；画面口径 {measurement.ViewportDiameter * 100f:0.0}%；" +
+                    $"镜片平面与相机 {measurement.CameraAxisError:0.00}° / 阈值 {LensAxisToleranceDegrees:0.00}°{sightAxis}";
+            }
+            string boundsState = !boundsMeasured
+                ? "未测量：当前没有可用的附件 Renderer 包围盒"
+                : insideAttachmentBounds
+                    ? "通过：镜片中心位于附件渲染包围盒附近"
+                    : $"失败：镜片中心距附件包围盒 {boundsDistance * 1000f:0.0}mm，疑似脱离模型";
+            string reviewState = assetLens != null && assetLens.VisualPlacementReviewed
+                ? "已确认"
+                : "待人工确认：青色边界必须覆盖真实后镜片开口，且不能越过镜框";
+            EditorGUILayout.HelpBox(
+                $"1. 倍率镜 Profile：{profileState}\n" +
+                $"2. 唯一 LensAnchor：{countState}\n" +
+                $"3. 统一校准根：{rootState}\n" +
+                $"4. Viewmodel Layer：{layerState}\n" +
+                $"5. 镜片方向契约：{authoredState}\n" +
+                $"6. ADS 实时测量：{liveState}\n" +
+                $"7. 模型包围盒粗检：{boundsState}\n" +
+                $"8. 真实镜框覆盖：{reviewState}",
+                ready ? MessageType.Info : MessageType.None);
+
+            if (measured && measurement.CentreError > LensCentreToleranceViewport)
+                EditorGUILayout.HelpBox(
+                    "镜片中心偏离屏幕：若青色边界已经贴合真实镜框，应调整“武器整体 ADS 姿态”；只有青色边界没有贴合镜框时才移动 LensAnchor。",
+                    MessageType.Warning);
+            if (measured && measurement.CameraAxisError > LensAxisToleranceDegrees)
+                EditorGUILayout.HelpBox(
+                    "镜片平面未正对 ADS 视线：先点击播种按钮获得无跳变初值，再用“旋转镜片平面”Scene 手柄小幅修正。",
+                    MessageType.Warning);
+            return automaticPass;
+        }
+
+        private static bool TryMeasureScopeLens(LowPolyShooterViewmodelRig rig, Camera camera,
+            out ScopeLensMeasurement measurement)
+        {
+            measurement = default;
+            if (rig == null || camera == null) return false;
+            ViewmodelScopeLens lens = null;
+            foreach (ViewmodelScopeLens candidate in rig.GetComponentsInChildren<ViewmodelScopeLens>(true))
+                if (candidate != null && candidate.gameObject.activeInHierarchy)
+                {
+                    lens = candidate;
+                    break;
+                }
+            if (lens == null) return false;
+
+            Vector3 centre = camera.WorldToViewportPoint(lens.transform.position);
+            Vector3 lossyScale = lens.transform.lossyScale;
+            float apertureScale = Mathf.Max(Mathf.Abs(lossyScale.x), Mathf.Abs(lossyScale.y));
+            float worldRadius = lens.ClearApertureDiameter * apertureScale * 0.5f;
+            Vector3 rightEdge = camera.WorldToViewportPoint(lens.transform.position + camera.transform.right * worldRadius);
+            Vector3 upEdge = camera.WorldToViewportPoint(lens.transform.position + camera.transform.up * worldRadius);
+            float viewportDiameter = Mathf.Max(Mathf.Abs(rightEdge.x - centre.x) * 2f,
+                Mathf.Abs(upEdge.y - centre.y) * 2f);
+            float centreError = Mathf.Max(Mathf.Abs(centre.x - 0.5f), Mathf.Abs(centre.y - 0.5f));
+            float cameraAxisError = Quaternion.Angle(lens.transform.rotation, camera.transform.rotation);
+            AdsSightReference sightReference = rig.AimAnchor != null
+                ? rig.AimAnchor.GetComponent<AdsSightReference>()
+                : null;
+            bool hasSightAxis = sightReference != null && sightReference.OrientationAuthored;
+            float sightAxisError = hasSightAxis
+                ? Vector3.Angle(lens.transform.forward, rig.AimAnchor.forward)
+                : 0f;
+            measurement = new ScopeLensMeasurement(lens, centre, viewportDiameter, centreError,
+                cameraAxisError, sightAxisError, hasSightAxis, centre.z > camera.nearClipPlane);
+            return true;
+        }
+
+        private static bool IsScopeLensMeasurementValid(ScopeLensMeasurement measurement)
+        {
+            return measurement.Lens != null && measurement.IsInFrontOfCamera &&
+                measurement.CentreError <= LensCentreToleranceViewport &&
+                measurement.ViewportDiameter >= LensMinimumViewportDiameter &&
+                measurement.ViewportDiameter <= LensMaximumViewportDiameter &&
+                measurement.CameraAxisError <= LensAxisToleranceDegrees &&
+                (!measurement.HasSightAxisMeasurement || measurement.SightAxisError <= LensAxisToleranceDegrees);
+        }
+
+        private static bool TryGetRendererBounds(Transform root, out Bounds bounds)
+        {
+            bounds = default;
+            if (root == null) return false;
+            bool found = false;
+            foreach (Renderer renderer in root.GetComponentsInChildren<Renderer>(true))
+            {
+                if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy ||
+                    renderer.name == "Runtime Scope Lens Surface") continue;
+                if (!found)
+                {
+                    bounds = renderer.bounds;
+                    found = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(renderer.bounds);
+                }
+            }
+            return found;
+        }
+
         private void StartPreview()
         {
             if (!CanPreview()) return;
@@ -1030,6 +1439,19 @@ namespace ProjectSun.FPS.Editor
 
         private void TickPreview()
         {
+            if (attachmentSceneDragActive && GUIUtility.hotControl == 0)
+            {
+                CompleteAttachmentSceneDrag();
+                return;
+            }
+            if (attachmentSceneDragActive)
+            {
+                // Scene handles own the edited instance until mouse-up. Re-applying ADS/animation here moves
+                // the handle reference frame underneath Unity's hot control and creates cumulative drift.
+                previousTickTime = EditorApplication.timeSinceStartup;
+                Repaint();
+                return;
+            }
             FlushDeferredAttachmentPrefabSave();
             if (!previewActive) return;
             if (!CanPreview())
@@ -1141,8 +1563,51 @@ namespace ProjectSun.FPS.Editor
             RenderRuntimeCameraPreview(mode, texture);
             GUI.DrawTexture(rect, texture, ScaleMode.StretchToFill, false);
             DrawCameraCentreOverlay(rect);
-            if (mode == PreviewMode.Ads) DrawActiveOpticReticlePreview(rect);
+            if (mode == PreviewMode.Ads)
+            {
+                DrawActiveOpticReticlePreview(rect);
+                if (showScopeLensGuides) DrawScopeLensPreviewOverlay(rect);
+            }
             GUI.Label(new Rect(rect.x + 6f, rect.y + 5f, rect.width - 12f, 18f), title, EditorStyles.whiteMiniLabel);
+        }
+
+        private void DrawScopeLensPreviewOverlay(Rect rect)
+        {
+            if (!TryMeasureScopeLens(adsPreviewRig, adsPreviewCamera, out ScopeLensMeasurement measurement) ||
+                measurement.Lens == null || measurement.ViewportCentre.z <= 0f) return;
+
+            ViewmodelScopeLens lens = measurement.Lens;
+            Vector3 lossyScale = lens.transform.lossyScale;
+            float apertureScale = Mathf.Max(Mathf.Abs(lossyScale.x), Mathf.Abs(lossyScale.y));
+            float worldRadius = lens.ClearApertureDiameter * apertureScale * 0.5f;
+            Vector3 right = adsPreviewCamera.WorldToViewportPoint(
+                lens.transform.position + adsPreviewCamera.transform.right * worldRadius);
+            Vector3 up = adsPreviewCamera.WorldToViewportPoint(
+                lens.transform.position + adsPreviewCamera.transform.up * worldRadius);
+            Vector2 centre = new Vector2(rect.x + measurement.ViewportCentre.x * rect.width,
+                rect.y + (1f - measurement.ViewportCentre.y) * rect.height);
+            float radiusX = Mathf.Abs(right.x - measurement.ViewportCentre.x) * rect.width;
+            float radiusY = Mathf.Abs(up.y - measurement.ViewportCentre.y) * rect.height;
+            if (radiusX < 1f || radiusY < 1f) return;
+
+            const int segmentCount = 48;
+            Vector3[] points = new Vector3[segmentCount + 1];
+            for (int index = 0; index <= segmentCount; index++)
+            {
+                float angle = index / (float)segmentCount * Mathf.PI * 2f;
+                points[index] = new Vector3(centre.x + Mathf.Cos(angle) * radiusX,
+                    centre.y + Mathf.Sin(angle) * radiusY, 0f);
+            }
+
+            Handles.BeginGUI();
+            Handles.color = new Color(0.15f, 1f, 0.95f, 0.95f);
+            Handles.DrawAAPolyLine(2.5f, points);
+            Handles.DrawLine(new Vector3(centre.x - 7f, centre.y), new Vector3(centre.x + 7f, centre.y));
+            Handles.DrawLine(new Vector3(centre.x, centre.y - 7f), new Vector3(centre.x, centre.y + 7f));
+            Handles.color = new Color(0.15f, 1f, 0.95f, 0.45f);
+            Handles.DrawDottedLine(centre, rect.center, 3f);
+            Handles.EndGUI();
+            GUI.Label(new Rect(centre.x + 8f, centre.y + 5f, 120f, 18f), "LensAnchor", EditorStyles.whiteMiniLabel);
         }
 
         private void DrawActiveOpticReticlePreview(Rect rect)
@@ -1579,12 +2044,64 @@ namespace ProjectSun.FPS.Editor
             return calibrationRoot != null ? calibrationRoot.transform : attachmentRoot.Find("Model");
         }
 
+        private static ViewmodelScopeLens FindScopeLens(Transform root)
+        {
+            return root != null ? root.GetComponentInChildren<ViewmodelScopeLens>(true) : null;
+        }
+
+        private bool TryGetLiveAttachmentRoot(LowPolyShooterViewmodelRig rig, out Transform attachmentRoot)
+        {
+            attachmentRoot = null;
+            if (rig == null || selectedOptic == null) return false;
+            attachmentRoot = FindDescendant(rig.transform, selectedOptic.displayName + " (Attachment Visual)");
+            return attachmentRoot != null;
+        }
+
+        private void ApplyScopeLensPrefabEditsToLivePreviews(WeaponAttachmentViewmodelVisual visual,
+            Vector3 lensPosition, Vector3 lensRotation, float apertureDiameter, bool orientationAuthored,
+            bool visualReviewed)
+        {
+            ApplyScopeLensPrefabEdits(previewRig, visual, lensPosition, lensRotation, apertureDiameter,
+                orientationAuthored, visualReviewed);
+            if (attachmentSceneDragActive)
+            {
+                SceneView.RepaintAll();
+                Repaint();
+                return;
+            }
+            ApplyScopeLensPrefabEdits(cameraPreviewRig, visual, lensPosition, lensRotation, apertureDiameter,
+                orientationAuthored, visualReviewed);
+            ApplyScopeLensPrefabEdits(adsPreviewRig, visual, lensPosition, lensRotation, apertureDiameter,
+                orientationAuthored, visualReviewed);
+            TickPreview();
+        }
+
+        private void ApplyScopeLensPrefabEdits(LowPolyShooterViewmodelRig rig,
+            WeaponAttachmentViewmodelVisual visual, Vector3 lensPosition, Vector3 lensRotation,
+            float apertureDiameter, bool orientationAuthored, bool visualReviewed)
+        {
+            if (rig == null || visual == null || !TryGetLiveAttachmentRoot(rig, out Transform attachmentRoot)) return;
+            ViewmodelScopeLens scopeLens = FindScopeLens(attachmentRoot);
+            if (scopeLens == null) return;
+            scopeLens.transform.localPosition = lensPosition;
+            scopeLens.transform.localEulerAngles = lensRotation;
+            scopeLens.Configure(apertureDiameter);
+            scopeLens.SetOrientationAuthored(orientationAuthored);
+            scopeLens.SetVisualPlacementReviewed(visualReviewed);
+        }
+
         private void ApplyAttachmentPrefabEditsToLivePreviews(WeaponAttachmentViewmodelVisual visual,
             bool updateAnchor, Vector3 anchorPosition, Vector3 anchorRotation, bool orientationAuthored,
             bool updateModel, Vector3 modelPosition, Vector3 modelRotation, Vector3 modelScale)
         {
             ApplyAttachmentPrefabEdits(previewRig, visual, updateAnchor, anchorPosition, anchorRotation,
                 orientationAuthored, updateModel, modelPosition, modelRotation, modelScale);
+            if (attachmentSceneDragActive)
+            {
+                SceneView.RepaintAll();
+                Repaint();
+                return;
+            }
             ApplyAttachmentPrefabEdits(cameraPreviewRig, visual, updateAnchor, anchorPosition, anchorRotation,
                 orientationAuthored, updateModel, modelPosition, modelRotation, modelScale);
             ApplyAttachmentPrefabEdits(adsPreviewRig, visual, updateAnchor, anchorPosition, anchorRotation,
@@ -1669,7 +2186,6 @@ namespace ProjectSun.FPS.Editor
 
         private void DrawAttachmentSceneEditHandle()
         {
-            EndAttachmentSceneUndoOnMouseUp();
             if (attachmentSceneEditMode == AttachmentSceneEditMode.None || selectedOptic == null || previewRig == null ||
                 loadedAttachmentPrefabContents == null || !TryGetSelectedOpticVisual(out WeaponAttachmentViewmodelVisual visual))
                 return;
@@ -1680,8 +2196,10 @@ namespace ProjectSun.FPS.Editor
 
             Transform assetAnchor = FindDescendant(loadedAttachmentPrefabContents.transform, visual.AimAnchorName);
             Transform assetModel = FindAttachmentCalibrationTransform(loadedAttachmentPrefabContents.transform);
+            ViewmodelScopeLens assetLens = FindScopeLens(loadedAttachmentPrefabContents.transform);
             Transform liveAnchor = FindDescendant(attachmentRoot, visual.AimAnchorName);
             Transform liveModel = FindAttachmentCalibrationTransform(attachmentRoot);
+            ViewmodelScopeLens liveLens = FindScopeLens(attachmentRoot);
             bool orientationAuthored = assetAnchor != null &&
                 assetAnchor.GetComponent<AdsSightReference>()?.OrientationAuthored == true;
 
@@ -1693,6 +2211,7 @@ namespace ProjectSun.FPS.Editor
                     Handles.Label(liveModel.position, " ATTACHMENT MODEL");
                     EditorGUI.BeginChangeCheck();
                     Vector3 modelPosition = Handles.PositionHandle(liveModel.position, liveModel.rotation);
+                    BeginAttachmentSceneUndoOnHandleGrab(false, true);
                     if (EditorGUI.EndChangeCheck())
                     {
                         ApplyAttachmentPrefabAssetEdits(visual, assetAnchor, assetModel, false, Vector3.zero,
@@ -1707,6 +2226,7 @@ namespace ProjectSun.FPS.Editor
                     Handles.Label(liveModel.position, " ATTACHMENT MODEL ROTATION");
                     EditorGUI.BeginChangeCheck();
                     Quaternion modelRotation = Handles.RotationHandle(liveModel.rotation, liveModel.position);
+                    BeginAttachmentSceneUndoOnHandleGrab(false, true);
                     if (EditorGUI.EndChangeCheck())
                     {
                         Quaternion localRotation = Quaternion.Inverse(liveModel.parent.rotation) * modelRotation;
@@ -1722,6 +2242,7 @@ namespace ProjectSun.FPS.Editor
                     Handles.Label(liveAnchor.position, " ADS SIGHT REFERENCE");
                     EditorGUI.BeginChangeCheck();
                     Vector3 anchorPosition = Handles.PositionHandle(liveAnchor.position, liveAnchor.rotation);
+                    BeginAttachmentSceneUndoOnHandleGrab(true, false);
                     if (EditorGUI.EndChangeCheck())
                     {
                         ApplyAttachmentPrefabAssetEdits(visual, assetAnchor, assetModel, true,
@@ -1737,6 +2258,7 @@ namespace ProjectSun.FPS.Editor
                     Handles.Label(liveAnchor.position, " ADS OPTICAL AXIS");
                     EditorGUI.BeginChangeCheck();
                     Quaternion anchorRotation = Handles.RotationHandle(liveAnchor.rotation, liveAnchor.position);
+                    BeginAttachmentSceneUndoOnHandleGrab(true, false);
                     if (EditorGUI.EndChangeCheck())
                     {
                         Quaternion localRotation = Quaternion.Inverse(liveAnchor.parent.rotation) * anchorRotation;
@@ -1745,30 +2267,108 @@ namespace ProjectSun.FPS.Editor
                             Vector3.zero, Vector3.one, BeginAttachmentSceneUndo(true, false));
                     }
                     break;
+
+                case AttachmentSceneEditMode.LensPosition:
+                    if (assetLens == null || liveLens == null || liveLens.transform.parent == null) return;
+                    Handles.color = new Color(0.15f, 1f, 0.95f, 0.95f);
+                    Handles.Label(liveLens.transform.position, " LENS ANCHOR");
+                    EditorGUI.BeginChangeCheck();
+                    Vector3 lensPosition = Handles.PositionHandle(liveLens.transform.position,
+                        liveLens.transform.rotation);
+                    BeginAttachmentSceneUndoOnHandleGrab(false, false, true);
+                    if (EditorGUI.EndChangeCheck())
+                        ApplyScopeLensPrefabAssetEdits(visual, assetLens,
+                            liveLens.transform.parent.InverseTransformPoint(lensPosition),
+                            assetLens.transform.localEulerAngles, assetLens.ClearApertureDiameter,
+                            assetLens.OrientationAuthored, false, BeginAttachmentSceneUndo(false, false, true));
+                    break;
+
+                case AttachmentSceneEditMode.LensRotation:
+                    if (assetLens == null || liveLens == null || liveLens.transform.parent == null) return;
+                    Handles.color = new Color(0.1f, 0.85f, 1f, 0.95f);
+                    Handles.Label(liveLens.transform.position, " LENS PLANE (+Z TARGET)");
+                    EditorGUI.BeginChangeCheck();
+                    Quaternion lensRotation = Handles.RotationHandle(liveLens.transform.rotation,
+                        liveLens.transform.position);
+                    BeginAttachmentSceneUndoOnHandleGrab(false, false, true);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Quaternion localRotation = Quaternion.Inverse(liveLens.transform.parent.rotation) * lensRotation;
+                        ApplyScopeLensPrefabAssetEdits(visual, assetLens, assetLens.transform.localPosition,
+                            localRotation.eulerAngles, assetLens.ClearApertureDiameter, true, false,
+                            BeginAttachmentSceneUndo(false, false, true));
+                    }
+                    break;
+
+                case AttachmentSceneEditMode.LensAperture:
+                    if (assetLens == null || liveLens == null) return;
+                    Handles.color = new Color(0.2f, 1f, 0.72f, 0.95f);
+                    Vector3 lensScale = liveLens.transform.lossyScale;
+                    float apertureScale = Mathf.Max(0.0001f,
+                        Mathf.Max(Mathf.Abs(lensScale.x), Mathf.Abs(lensScale.y)));
+                    float worldRadius = liveLens.ClearApertureDiameter * apertureScale * 0.5f;
+                    Handles.Label(liveLens.transform.position, " CLEAR APERTURE");
+                    EditorGUI.BeginChangeCheck();
+                    float newWorldRadius = Handles.RadiusHandle(liveLens.transform.rotation,
+                        liveLens.transform.position, worldRadius);
+                    BeginAttachmentSceneUndoOnHandleGrab(false, false, true);
+                    if (EditorGUI.EndChangeCheck())
+                        ApplyScopeLensPrefabAssetEdits(visual, assetLens, assetLens.transform.localPosition,
+                            assetLens.transform.localEulerAngles,
+                            Mathf.Clamp(newWorldRadius * 2f / apertureScale, 0.005f, 0.15f),
+                            assetLens.OrientationAuthored, false,
+                            BeginAttachmentSceneUndo(false, false, true));
+                    break;
             }
         }
 
-        private int BeginAttachmentSceneUndo(bool anchorChanged, bool modelChanged)
+        private int BeginAttachmentSceneUndo(bool anchorChanged, bool modelChanged, bool lensChanged = false)
         {
             if (attachmentSceneUndoGroup >= 0) return attachmentSceneUndoGroup;
             Undo.IncrementCurrentGroup();
             attachmentSceneUndoGroup = Undo.GetCurrentGroup();
-            Undo.SetCurrentGroupName(GetAttachmentEditUndoName(anchorChanged, modelChanged));
+            Undo.SetCurrentGroupName(GetAttachmentEditUndoName(anchorChanged, modelChanged, lensChanged));
+            attachmentSceneDragActive = true;
+            attachmentSceneDragMode = attachmentSceneEditMode;
             return attachmentSceneUndoGroup;
+        }
+
+        private void BeginAttachmentSceneUndoOnHandleGrab(bool anchorChanged, bool modelChanged,
+            bool lensChanged = false)
+        {
+            if (attachmentSceneDragActive || Event.current == null ||
+                Event.current.rawType != EventType.MouseDown || GUIUtility.hotControl == 0) return;
+            BeginAttachmentSceneUndo(anchorChanged, modelChanged, lensChanged);
         }
 
         private void EndAttachmentSceneUndoOnMouseUp()
         {
-            if (attachmentSceneUndoGroup < 0 || Event.current == null || Event.current.type != EventType.MouseUp) return;
-            Undo.CollapseUndoOperations(attachmentSceneUndoGroup);
+            if (!attachmentSceneDragActive || Event.current == null || Event.current.type != EventType.MouseUp) return;
+            CompleteAttachmentSceneDrag();
+        }
+
+        private void CompleteAttachmentSceneDrag()
+        {
+            if (!attachmentSceneDragActive && attachmentSceneUndoGroup < 0) return;
+            int undoGroup = attachmentSceneUndoGroup;
             attachmentSceneUndoGroup = -1;
+            attachmentSceneDragActive = false;
+            attachmentSceneDragMode = AttachmentSceneEditMode.None;
+            if (undoGroup >= 0) Undo.CollapseUndoOperations(undoGroup);
+            if (attachmentPrefabSavePending) SaveAttachmentPrefabContentsNow(true);
+            SynchronizeLoadedAttachmentPrefabToLivePreviews();
+            previousTickTime = EditorApplication.timeSinceStartup;
+            SceneView.RepaintAll();
+            Repaint();
         }
 
         private void DrawSceneGuides(SceneView sceneView)
         {
             if (!previewActive || !CanPreview()) return;
             if (showClipProbeGuides) DrawClipProbeGuides(previewRig, previewCamera);
+            if (showScopeLensGuides) DrawScopeLensSceneGuide(previewRig, previewCamera);
             DrawAttachmentSceneEditHandle();
+            EndAttachmentSceneUndoOnMouseUp();
             if (previewMode == PreviewMode.Hip || profile == null) return;
             Vector3 cameraPosition = previewCamera.transform.position;
             Vector3 aimEnd = cameraPosition + previewCamera.transform.forward * 3f;
@@ -1812,6 +2412,26 @@ namespace ProjectSun.FPS.Editor
             Handles.color = new Color(1f, 0.78f, 0.2f, 0.9f);
             Handles.DrawDottedLine(previewRig.Muzzle.position, target, 4f);
             Handles.Label(previewRig.Muzzle.position, " MUZZLE ZERO PATH");
+        }
+
+        private static void DrawScopeLensSceneGuide(LowPolyShooterViewmodelRig rig, Camera camera)
+        {
+            if (!TryMeasureScopeLens(rig, camera, out ScopeLensMeasurement measurement) ||
+                measurement.Lens == null) return;
+            ViewmodelScopeLens lens = measurement.Lens;
+            Vector3 lossyScale = lens.transform.lossyScale;
+            float radius = lens.ClearApertureDiameter *
+                Mathf.Max(Mathf.Abs(lossyScale.x), Mathf.Abs(lossyScale.y)) * 0.5f;
+            bool valid = IsScopeLensMeasurementValid(measurement) && lens.OrientationAuthored;
+            Handles.color = valid
+                ? new Color(0.15f, 1f, 0.78f, 0.95f)
+                : new Color(0.15f, 0.82f, 1f, 0.95f);
+            Handles.DrawWireDisc(lens.transform.position, lens.transform.forward, radius);
+            Handles.DrawAAPolyLine(3f, lens.transform.position,
+                lens.transform.position + lens.transform.forward * Mathf.Max(0.12f, radius * 3f));
+            Handles.Label(lens.transform.position + lens.transform.up * (radius + 0.006f),
+                $" LENS · {lens.ClearApertureDiameter * 1000f:0.0}mm · " +
+                (lens.OrientationAuthored ? "AUTHORED" : "FALLBACK"));
         }
 
         private void DrawClipProbeGuides(LowPolyShooterViewmodelRig rig, Camera camera)
@@ -1865,6 +2485,22 @@ namespace ProjectSun.FPS.Editor
             Vector3 localDelta = attachmentRoot.InverseTransformVector(desiredWorldMovement.normalized * visualNudgeStep);
             ApplyAttachmentPrefabAssetEdits(visual, assetAnchor, assetModel, false, Vector3.zero, Vector3.zero,
                 false, true, assetModel.localPosition + localDelta, assetModel.localEulerAngles, assetModel.localScale);
+        }
+
+        private void NudgeScopeLens(WeaponAttachmentViewmodelVisual visual, Vector3 desiredWorldMovement)
+        {
+            if (!previewActive || visual == null || desiredWorldMovement.sqrMagnitude < 0.000001f ||
+                loadedAttachmentPrefabContents == null || !TryGetLiveAttachmentRoot(previewRig,
+                    out Transform attachmentRoot)) return;
+            ViewmodelScopeLens assetLens = FindScopeLens(loadedAttachmentPrefabContents.transform);
+            ViewmodelScopeLens liveLens = FindScopeLens(attachmentRoot);
+            if (assetLens == null || liveLens == null || liveLens.transform.parent == null) return;
+
+            Vector3 localDelta = liveLens.transform.parent.InverseTransformVector(
+                desiredWorldMovement.normalized * visualNudgeStep);
+            ApplyScopeLensPrefabAssetEdits(visual, assetLens, assetLens.transform.localPosition + localDelta,
+                assetLens.transform.localEulerAngles, assetLens.ClearApertureDiameter,
+                assetLens.OrientationAuthored, false);
         }
 
         private void SetVisualReferenceOffset(Vector3 newOffset, string undoLabel)

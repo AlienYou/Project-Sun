@@ -7,8 +7,8 @@ using UnityEngine.Rendering.Universal;
 namespace ProjectSun.FPS.Presentation
 {
     /// <summary>
-    /// Renders a magnified, world-only view into a physical lens surface parented to the equipped
-    /// optic's Aim Anchor. Gameplay rays continue to use the main player camera.
+    /// Renders a magnified, world-only view into the equipped optic's authored physical lens aperture.
+    /// Gameplay rays continue to use the main player camera and never depend on this visual surface.
     /// </summary>
     [DefaultExecutionOrder(100)]
     [DisallowMultipleComponent]
@@ -215,17 +215,18 @@ namespace ProjectSun.FPS.Presentation
         {
             Transform lensAnchor = ResolveLensAnchor();
             if (lensSurface == null || activeProfile == null || lensAnchor == null || worldCamera == null) return;
-            // Aim Anchor rotation is not a lens-plane contract: ADS derives its sight frame from the
-            // anchor-to-muzzle vector. Face the generated disc toward the live view camera so imported
-            // weapon axes cannot turn the Render Texture into a narrow edge-on strip.
+            // Migrated lenses author a complete optical frame: local +Z looks toward the target and
+            // local +Y is sight up. Legacy lenses retain the camera-facing fallback until Workbench
+            // seeds that frame, so upgrading the component cannot suddenly turn old lenses edge-on.
             Vector3 towardCamera = worldCamera.transform.position - lensAnchor.position;
             if (towardCamera.sqrMagnitude < 0.000001f) towardCamera = -worldCamera.transform.forward;
             towardCamera.Normalize();
+            Quaternion lensRotation = activeScopeLens != null && activeScopeLens.OrientationAuthored
+                ? lensAnchor.rotation
+                : worldCamera.transform.rotation;
             lensSurface.transform.SetPositionAndRotation(
                 lensAnchor.position + towardCamera * activeProfile.LensTowardCameraOffset,
-                // Keep local X/Y aligned with camera right/up so the Render Texture is not mirrored.
-                // The generated disc is double-sided, therefore its normal may point away from the eye.
-                worldCamera.transform.rotation);
+                lensRotation);
             float apertureDiameter = activeScopeLens != null
                 ? activeScopeLens.ClearApertureDiameter
                 : activeProfile.LensPhysicalDiameter;
