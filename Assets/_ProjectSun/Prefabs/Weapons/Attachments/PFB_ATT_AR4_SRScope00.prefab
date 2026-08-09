@@ -42,8 +42,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2eafc0fe9f47e6041b082adb12427ebe, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   validationLabel: SR Scope 00 Housing
   surfaceRadius: 0.045
   participatesInValidation: 1
@@ -74,7 +74,7 @@ Transform:
   m_GameObject: {fileID: 900000000000000002}
   serializedVersion: 2
   m_LocalRotation: {x: 0.705374, y: 0.00006212143, z: -0.00008084031, w: 0.7088353}
-  m_LocalPosition: {x: -0.0009539483, y: 0.0483264, z: 0.044343863}
+  m_LocalPosition: {x: -0.00073424884, y: 0.048326366, z: 0.044343174}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -90,11 +90,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d97d33a3f05b499e93daac5eeb3b8754, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   clearApertureDiameter: 0.036070704
   orientationAuthored: 1
-  visualPlacementReviewed: 1
+  visualPlacementReviewed: 0
 --- !u!1 &910000000000000002
 GameObject:
   m_ObjectHideFlags: 0
@@ -121,7 +121,7 @@ Transform:
   m_GameObject: {fileID: 910000000000000002}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0.000707816, y: 0.00017790665, z: 0.00002863616}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -141,8 +141,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8bc1d25166d047fc9fc73b57333fd1f7, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1119603796469200438
 GameObject:
   m_ObjectHideFlags: 0
@@ -332,6 +332,6 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a3288752084946febd102c2c090d9a61, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   orientationAuthored: 0

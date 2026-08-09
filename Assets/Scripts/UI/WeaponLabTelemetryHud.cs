@@ -74,7 +74,7 @@ namespace ProjectSun.FPS.UI
             if (scopeRenderer == null) scopeRenderer = weapon.GetComponent<ScopeSightRenderer>();
 
             const float previewSize = 132f;
-            Rect panel = new Rect(screenWidth - 310f, top, 286f, 190f);
+            Rect panel = new Rect(screenWidth - 310f, top, 286f, 264f);
             GUI.Box(panel, GUIContent.none);
             GUI.Label(new Rect(panel.x + 12f, panel.y + 8f, panel.width - 24f, 20f),
                 "SCOPE RENDER DIAGNOSTICS", titleStyle);
@@ -91,8 +91,13 @@ namespace ProjectSun.FPS.UI
             if (texture != null) GUI.DrawTexture(preview, texture, ScaleMode.StretchToFill, false);
 
             string textureSize = texture != null ? $"{texture.width}x{texture.height}" : "NONE";
-            GUI.Label(new Rect(panel.x + 152f, panel.y + 38f, 124f, 132f),
-                $"Status\n{scopeRenderer.DiagnosticStatus}\n\nRT  {textureSize}\nFOV {scopeRenderer.ScopeFieldOfView:0.0}\u00b0\nAnchor\n{scopeRenderer.ActiveAnchorName}", bodyStyle);
+            string composite = scopeRenderer.UsesIntegratedLensShader ? "AA + RETICLE" : "FALLBACK";
+            GUI.Label(new Rect(panel.x + 152f, panel.y + 38f, 124f, 216f),
+                $"Status\n{scopeRenderer.DiagnosticStatus}\n\nRT  {textureSize}\nFOV {scopeRenderer.ScopeFieldOfView:0.0}\u00b0\n" +
+                $"Lens {composite}\nFade {scopeRenderer.LensOpacity:P0}\n" +
+                $"Outside\n{scopeRenderer.PeripheralDiagnosticStatus}\n" +
+                $"Eye {scopeRenderer.EyeReliefMillimetres:0}mm\nAxis {scopeRenderer.EyeboxAngleDegrees:0.0}\u00b0\n" +
+                $"Eyebox {scopeRenderer.EyeboxSeverity:P0}\nAnchor\n{scopeRenderer.ActiveAnchorName}", bodyStyle);
         }
 
         private void RecordHit(RaycastHit hit)

@@ -61,6 +61,8 @@ namespace ProjectSun.FPS.Editor
         [SerializeField] private bool showAdsConfiguration = true;
         [SerializeField] private bool showAttachmentGeometryRepair;
         [SerializeField] private bool showScopeLensCalibration = true;
+        [SerializeField] private bool showScopeLensRenderingConfiguration = true;
+        [SerializeField] private bool showScopePeripheralConfiguration;
         [SerializeField] private bool showScopeLensValidationDetails = true;
         [SerializeField] private bool showScopeLensGuides = true;
         [SerializeField] private PreviewMode previewMode = PreviewMode.Compare;
@@ -609,6 +611,7 @@ namespace ProjectSun.FPS.Editor
                 return;
             }
 
+            DrawMagnifiedLensRenderingProfile(opticProfile);
             ViewmodelScopeLens scopeLens = scopeLenses[0];
             using (new EditorGUI.DisabledScope(true))
                 EditorGUILayout.ObjectField("LensAnchor", scopeLens, typeof(ViewmodelScopeLens), true);
@@ -683,6 +686,90 @@ namespace ProjectSun.FPS.Editor
                     ApplyScopeLensPrefabAssetEdits(visual, scopeLens, scopeLens.transform.localPosition,
                         scopeLens.transform.localEulerAngles, scopeLens.ClearApertureDiameter,
                         scopeLens.OrientationAuthored, true, -1, "确认倍率镜镜片视觉覆盖");
+        }
+
+        private void DrawMagnifiedLensRenderingProfile(OpticSightProfile opticProfile)
+        {
+            showScopeLensRenderingConfiguration = EditorGUILayout.Foldout(showScopeLensRenderingConfiguration,
+                "镜片渲染与镜内准星", true);
+            if (!showScopeLensRenderingConfiguration || opticProfile == null) return;
+
+            SerializedObject serializedOptic = new SerializedObject(opticProfile);
+            serializedOptic.Update();
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(serializedOptic.FindProperty("magnification"), new GUIContent("镜内倍率"));
+            EditorGUILayout.PropertyField(serializedOptic.FindProperty("lensRenderResolutionScale"),
+                new GUIContent("RT 分辨率倍率"));
+            EditorGUILayout.PropertyField(serializedOptic.FindProperty("lensEdgeSoftness"),
+                new GUIContent("镜片边缘抗锯齿"));
+            EditorGUILayout.PropertyField(serializedOptic.FindProperty("lensFadeDuration"),
+                new GUIContent("开镜渐变时间"));
+            EditorGUILayout.PropertyField(serializedOptic.FindProperty("lensMaskTexture"),
+                new GUIContent("可选镜片遮罩"));
+            showScopePeripheralConfiguration = EditorGUILayout.Foldout(showScopePeripheralConfiguration,
+                "镜外弱化与 Eyebox", true);
+            if (showScopePeripheralConfiguration)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.PropertyField(serializedOptic.FindProperty("outsideLensDim"),
+                    new GUIContent("镜外暗化"));
+                EditorGUILayout.PropertyField(serializedOptic.FindProperty("outsideLensBlurPixels"),
+                    new GUIContent("镜外模糊半径"));
+                EditorGUILayout.PropertyField(serializedOptic.FindProperty("peripheralEdgeSoftness"),
+                    new GUIContent("镜外边缘过渡"));
+                EditorGUILayout.PropertyField(serializedOptic.FindProperty("eyeboxEnabled"),
+                    new GUIContent("启用 Eyebox"));
+                if (serializedOptic.FindProperty("eyeboxEnabled").boolValue)
+                {
+                    EditorGUILayout.PropertyField(serializedOptic.FindProperty("idealEyeRelief"),
+                        new GUIContent("理想眼距（米）"));
+                    EditorGUILayout.PropertyField(serializedOptic.FindProperty("eyeReliefTolerance"),
+                        new GUIContent("眼距安全范围"));
+                    EditorGUILayout.PropertyField(serializedOptic.FindProperty("eyeReliefTransition"),
+                        new GUIContent("眼距黑边过渡"));
+                    EditorGUILayout.PropertyField(serializedOptic.FindProperty("eyeboxAngularTolerance"),
+                        new GUIContent("光轴安全角（度）"));
+                    EditorGUILayout.PropertyField(serializedOptic.FindProperty("eyeboxAngularTransition"),
+                        new GUIContent("光轴黑边过渡（度）"));
+                    EditorGUILayout.PropertyField(serializedOptic.FindProperty("eyeboxPupilShift"),
+                        new GUIContent("出瞳偏移上限"));
+                    EditorGUILayout.PropertyField(serializedOptic.FindProperty("eyeboxPupilContraction"),
+                        new GUIContent("出瞳收缩上限"));
+                    EditorGUILayout.PropertyField(serializedOptic.FindProperty("eyeboxMaxOcclusion"),
+                        new GUIContent("黑边最大强度"));
+                }
+                EditorGUI.indentLevel--;
+                EditorGUILayout.HelpBox(
+                    "镜外模糊由全局画质自动分档：Very Low/Low 仅暗化，Medium/High 为 4 次采样，Very High/Ultra 为 8 次采样。Profile 只定义该瞄具的视觉强度。",
+                    MessageType.None);
+            }
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.PropertyField(serializedOptic.FindProperty("reticleTexture"),
+                new GUIContent("准星贴图"));
+            EditorGUILayout.PropertyField(serializedOptic.FindProperty("fallbackReticleStyle"),
+                new GUIContent("无贴图后备准星"));
+            EditorGUILayout.PropertyField(serializedOptic.FindProperty("reticleColor"),
+                new GUIContent("准星颜色与亮度"));
+            EditorGUILayout.PropertyField(serializedOptic.FindProperty("reticleSizePixels"),
+                new GUIContent("准星点/线尺寸"));
+            EditorGUILayout.PropertyField(serializedOptic.FindProperty("frameSizePixels"),
+                new GUIContent("准星外框尺寸"));
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(opticProfile, "调整倍率镜渲染与镜内准星");
+                serializedOptic.ApplyModifiedProperties();
+                EditorUtility.SetDirty(opticProfile);
+                TickPreview();
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("选择瞄具视图 Profile")) Selection.activeObject = opticProfile;
+                if (GUILayout.Button("保存瞄具视图 Profile")) AssetDatabase.SaveAssets();
+            }
+            EditorGUILayout.HelpBox(
+                "倍率镜准星现在由镜片 Shader 合成并受镜片遮罩裁剪；红点与全息仍使用非倍率 HUD/反射式路径。未指定准星贴图时使用程序化后备准星。",
+                MessageType.None);
         }
 
         private void SeedScopeLensOrientation(WeaponAttachmentViewmodelVisual visual, ViewmodelScopeLens assetLens)
@@ -1686,7 +1773,18 @@ namespace ProjectSun.FPS.Editor
         {
             WeaponAttachment optic = previewLoadout != null ? previewLoadout.GetEquipped(AttachmentSlot.Optic) : null;
             if (optic == null || optic.OpticSightProfile == null) return;
-            OpticReticleGui.Draw(optic.OpticSightProfile, rect);
+            Rect reticleViewport = rect;
+            if (optic.OpticSightProfile.UsesMagnifiedLensRendering)
+            {
+                if (!TryMeasureScopeLens(adsPreviewRig, adsPreviewCamera,
+                        out ScopeLensMeasurement measurement) || measurement.ViewportCentre.z <= 0f) return;
+                Vector2 centre = new Vector2(rect.x + measurement.ViewportCentre.x * rect.width,
+                    rect.y + (1f - measurement.ViewportCentre.y) * rect.height);
+                float diameter = Mathf.Max(8f, measurement.ViewportDiameter * Mathf.Min(rect.width, rect.height));
+                reticleViewport = new Rect(centre.x - diameter * 0.5f, centre.y - diameter * 0.5f,
+                    diameter, diameter);
+            }
+            OpticReticleGui.Draw(optic.OpticSightProfile, reticleViewport);
         }
 
         private static void DrawCameraCentreOverlay(Rect previewRect)

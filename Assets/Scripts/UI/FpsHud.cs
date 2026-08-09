@@ -130,10 +130,10 @@ namespace ProjectSun.FPS.UI
         {
             WeaponAttachment optic = weapon.Loadout != null ? weapon.Loadout.GetEquipped(AttachmentSlot.Optic) : null;
             if (optic == null || optic.OpticSightProfile == null) return;
-            Rect viewport = scopeSightRenderer != null && scopeSightRenderer.IsActive
-                ? scopeSightRenderer.ReticleViewport
-                : new Rect(0f, 0f, width, height);
-            OpticReticleGui.Draw(optic.OpticSightProfile, viewport);
+            // Magnified reticles are composited inside the physical lens material. Drawing the same
+            // reticle through IMGUI would leak it outside the aperture and produce a duplicate overlay.
+            if (optic.OpticSightProfile.UsesMagnifiedLensRendering) return;
+            OpticReticleGui.Draw(optic.OpticSightProfile, new Rect(0f, 0f, width, height));
         }
 
         private void UpdateMagnifiedSight()

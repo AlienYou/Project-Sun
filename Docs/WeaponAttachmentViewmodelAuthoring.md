@@ -80,6 +80,22 @@ SOCKET_Scope
 
 中心偏差统一换算为 `1920×1080` 参考像素，并显示带方向的 X/Y 数值：正 X 表示偏右，负 X 表示偏左，正 Y 表示偏上，负 Y 表示偏下。最大轴偏差不超过 `2px` 显示 **精确对准**；超过 `2px` 但仍处于镜片工程容差内显示 **工程通过**；超出工程容差显示 **未通过**。窗口尺寸不会改变该分级结果。
 
+### 镜片渲染与镜内准星
+
+倍率镜使用 `_ProjectSun/Resources/ProjectSunScopeLens.shader` 完成单次透明合成：镜内世界 Render Texture、解析度无关的圆形抗锯齿边缘、可选 `lensMaskTexture`、程序化或贴图准星以及 ADS 透明度渐变。Shader 位于 Resources 是为了保证动态创建的镜片材质在正式构建中不会被剥离；运行时若只能找到通用 Unlit 后备 Shader，WeaponLab 诊断会显示 `Lens FALLBACK`，不能作为商业验收结果。
+
+Workbench 的 **镜片渲染与镜内准星** 折叠区直接编辑 `OpticSightProfile`：倍率、RT 分辨率倍率、边缘抗锯齿、渐变时间、镜片遮罩、准星贴图、后备形状、颜色和尺寸。倍率镜准星只在物理镜片材质内绘制并受遮罩裁剪；`FpsHud` 不再为倍率镜绘制全屏准星。红点和全息仍使用独立的非倍率显示路径。
+
+### 镜外弱化与 Eyebox
+
+镜外表现由 `ScopePeripheralRenderFeature` 在 Viewmodel Overlay Camera 的透明物体渲染结束后合成。Renderer Pass 会以活动镜片表面的同一个 `MeshRenderer`、运行时材质和当前相机矩阵生成单通道口径 Mask，再按该 Mask 保留镜内清晰区域；它不再把三维锚点提前近似成屏幕椭圆，因此 ADS 动画、后坐和平移期间读取的是镜片网格的最终变换。`Project Sun/Ensure Scope Peripheral Renderer Feature` 可修复新建的 URP Renderer；编辑器脚本重载后也会自动检查 `Assets/Settings` 下的 Project Sun Renderer。
+
+模糊质量服从全局画质而不是单个瞄具资源：Very Low/Low 仅暗化，Medium/High 使用 4 次周边采样，Very High/Ultra 使用 8 次周边采样。`OpticSightProfile` 只保存该瞄具的镜外暗化、模糊半径和边缘过渡强度，避免美术资源反向控制整机性能策略。
+
+Eyebox 使用相机在镜片光学坐标系中的实时位置计算。理想眼距、安全眼距范围和光轴安全角内保持完整出瞳；超出后按各自过渡区间逐渐移动并收缩可见出瞳，最终产生镜内黑边。它只改变视觉，不改变相机中心、射击射线或弹道。WeaponLab 诊断中的 `Eye`、`Axis` 和 `Eyebox` 分别表示实时眼距、光轴夹角和黑边强度；正常静止 ADS 应接近 `Eyebox 0%`。
+
+ADS 过渡期间，倍率相机从玩家眼睛朝当帧物理镜片中心建立取景方向；镜外口径则在 Viewmodel Overlay Camera 的 Renderer Pass 中直接重绘同一个镜片网格生成 Mask。这样镜内中心射线、运行时镜片表面和镜外清晰边界共享同一几何姿态，不依赖脚本投影时序。倍率镜内外只要求中心方向连续；镜内画面具有光学倍率，边缘物体不会也不应与未放大的镜外背景按相同比例拼接，否则等同于取消倍率。
+
 ## 动态配件校准
 
 通过 `Project Sun/Tools/Weapon Presentation Workbench` 选择 Player、武器槽位和 **校准瞄具**。工作台会创建临时 Loadout，并在源预览与两份隔离相机预览中调用与游戏一致的 `WeaponAttachmentViewmodelPresenter` 装配链路；停止预览后会销毁临时外观并恢复 Player 原生部件，不会把预览对象写入 Player 预制体。
@@ -118,7 +134,7 @@ SOCKET_Scope
 
 `OpticSightProfile` 与 `WeaponAdsProfile` 分工明确：前者定义 ADS 时显示的准星纹样、颜色和尺寸，后者定义武器姿态、开镜速度与 FOV 缩减。执行 `Project Sun/Ensure Optic Sight Presentation Profiles` 后，M2 红点、H7 全息以及已导入的两支倍镜会各自绑定一份可编辑的视图配置；准星会同时显示在游戏 HUD 与 Workbench 的 ADS 预览中。
 
-当前的点、环点和十字为代码后备表现，便于先完成玩法与对齐验收。正式商业资源交付时，应在 `OpticSightProfile` 中填入项目自有的高分辨率准星贴图。倍镜已进入独立相机、Render Texture 与 `LensAnchor` 的真实透镜实现阶段；镜片遮罩、镜外弱化和最终材质仍需继续验收，不能与 ADS 瞄准基准校准混为一谈。
+当前的点、环点和十字为程序化后备表现，便于先完成玩法与对齐验收。正式商业资源交付时，应在 `OpticSightProfile` 中填入项目自有的高分辨率准星贴图。倍镜已经具备独立相机、Render Texture、`LensAnchor`、抗锯齿遮罩、镜内准星、渐变、镜外分档弱化和 Eyebox；目标硬件上的最终性能预算仍需继续验收，不能与 ADS 瞄准基准校准混为一谈。
 
 ## 当前资源状态
 

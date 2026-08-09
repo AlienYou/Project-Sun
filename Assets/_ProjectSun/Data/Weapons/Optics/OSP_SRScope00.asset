@@ -13,8 +13,28 @@ MonoBehaviour:
   m_Name: OSP_SRScope00
   m_EditorClassIdentifier: Assembly-CSharp:ProjectSun.FPS.Weapons:OpticSightProfile
   sightType: 2
-  fallbackReticleStyle: 3
+  fallbackReticleStyle: 1
   reticleTexture: {fileID: 0}
   reticleColor: {r: 0.12, g: 0.96, b: 0.2, a: 0.9}
-  reticleSizePixels: 3
+  reticleSizePixels: 5
   frameSizePixels: 44
+  magnification: 4
+  lensViewportScale: 0.68
+  outsideLensDim: 0.35
+  outsideLensBlurPixels: 2
+  peripheralEdgeSoftness: 1.5
+  lensRenderResolutionScale: 0.7
+  lensEdgeSoftness: 1.25
+  lensFadeDuration: 0.1
+  lensMaskTexture: {fileID: 0}
+  lensPhysicalDiameter: 0.045
+  lensTowardCameraOffset: 0.0008
+  eyeboxEnabled: 1
+  idealEyeRelief: 0.09
+  eyeReliefTolerance: 0.035
+  eyeReliefTransition: 0.04
+  eyeboxAngularTolerance: 2.5
+  eyeboxAngularTransition: 4
+  eyeboxPupilShift: 0.12
+  eyeboxPupilContraction: 0.28
+  eyeboxMaxOcclusion: 0.92
