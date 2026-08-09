@@ -121,5 +121,27 @@ namespace ProjectSun.FPS.Rounds
             member = slots[slotIndex];
             return member != null;
         }
+
+        /// <summary>
+        /// 按稳定槽位循环查找下一名存活成员。该顺序可直接用于死亡观战切换，避免摄像机目标因场景查找顺序而跳变。
+        /// </summary>
+        /// <param name="afterSlotIndex">从该槽位之后开始查找；-1 表示从槽位 0 开始，超出范围也按 -1 处理。</param>
+        /// <param name="member">成功时返回下一名存活成员；没有存活成员时返回 null。</param>
+        /// <returns>至少找到一名已注册且存活的成员时返回 true。</returns>
+        public bool TryGetNextLivingMember(int afterSlotIndex, out TeamCombatant member)
+        {
+            int normalizedSlot = afterSlotIndex >= -1 && afterSlotIndex < slots.Length ? afterSlotIndex : -1;
+            for (int offset = 1; offset <= slots.Length; offset++)
+            {
+                int slotIndex = (normalizedSlot + offset) % slots.Length;
+                TeamCombatant candidate = slots[slotIndex];
+                if (candidate == null || !candidate.IsAlive) continue;
+                member = candidate;
+                return true;
+            }
+
+            member = null;
+            return false;
+        }
     }
 }

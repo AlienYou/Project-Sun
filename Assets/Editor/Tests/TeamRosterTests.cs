@@ -1,3 +1,4 @@
+using System.Reflection;
 using NUnit.Framework;
 using ProjectSun.FPS.Core;
 using ProjectSun.FPS.Rounds;
@@ -76,6 +77,33 @@ namespace ProjectSun.FPS.Editor.Tests
             }
         }
 
+        [Test]
+        public void NextLivingMember_SkipsEliminatedSlotAndWraps()
+        {
+            GameObject firstObject = CreateCombatant("First", CombatTeam.Attackers, 0, out TeamCombatant first);
+            GameObject eliminatedObject = CreateCombatant("Eliminated", CombatTeam.Attackers, 1, out TeamCombatant eliminated);
+            GameObject lastObject = CreateCombatant("Last", CombatTeam.Attackers, 5, out TeamCombatant last);
+            try
+            {
+                TeamRoster roster = new TeamRoster(CombatTeam.Attackers, 6);
+                Assert.That(roster.TryAssign(first, 0, out _), Is.True);
+                Assert.That(roster.TryAssign(eliminated, 1, out _), Is.True);
+                Assert.That(roster.TryAssign(last, 5, out _), Is.True);
+                eliminated.Health.ApplyDamage(new DamageInfo(999f, Vector3.zero, Vector3.forward, null));
+
+                Assert.That(roster.TryGetNextLivingMember(0, out TeamCombatant afterFirst), Is.True);
+                Assert.That(afterFirst, Is.SameAs(last));
+                Assert.That(roster.TryGetNextLivingMember(5, out TeamCombatant wrapped), Is.True);
+                Assert.That(wrapped, Is.SameAs(first));
+            }
+            finally
+            {
+                Object.DestroyImmediate(firstObject);
+                Object.DestroyImmediate(eliminatedObject);
+                Object.DestroyImmediate(lastObject);
+            }
+        }
+
         /// <summary>创建仅用于 EditMode 名册验证的最小战斗成员。</summary>
         /// <param name="objectName">临时 GameObject 名称，用于让失败信息可读。</param>
         /// <param name="team">写入成员的阵营。</param>
@@ -86,9 +114,16 @@ namespace ProjectSun.FPS.Editor.Tests
             out TeamCombatant combatant)
         {
             GameObject gameObject = new GameObject(objectName);
-            gameObject.AddComponent<Health>();
+            Health health = gameObject.AddComponent<Health>();
+            health.ResetHealth();
             combatant = gameObject.AddComponent<TeamCombatant>();
             combatant.AssignTeamSlot(team, slotIndex);
+            if (combatant.Health == null)
+            {
+                // 普通 MonoBehaviour 的 Awake 不会在所有 EditMode 环境中自动执行，测试只在尚未初始化时补调一次。
+                MethodInfo awake = typeof(TeamCombatant).GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic);
+                awake?.Invoke(combatant, null);
+            }
             return gameObject;
         }
     }

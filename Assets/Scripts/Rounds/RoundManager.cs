@@ -72,6 +72,17 @@ namespace ProjectSun.FPS.Rounds
         public TeamRoster AttackerRoster => attackerRoster;
         /// <summary>防守方稳定槽位名册；初始化前可能为 null。</summary>
         public TeamRoster DefenderRoster => defenderRoster;
+        /// <summary>当前本地玩家的阵营成员身份；初始化前可能为 null。</summary>
+        public TeamCombatant LocalPlayerCombatant => playerCombatant;
+        /// <summary>本地玩家所属阵营；尚未加入名册时返回 None。</summary>
+        public CombatTeam LocalPlayerTeam => playerCombatant != null ? playerCombatant.Team : CombatTeam.None;
+        /// <summary>本地玩家是否已经被本回合淘汰。</summary>
+        public bool IsLocalPlayerEliminated => playerCombatant != null && !playerCombatant.IsAlive;
+        /// <summary>
+        /// 本地玩家死亡后是否存在合法的同阵营观战目标。这里只发布规则状态，不直接驱动摄像机。
+        /// </summary>
+        public bool CanLocalPlayerSpectate => state == RoundState.Active && IsLocalPlayerEliminated &&
+                                              GetRoster(LocalPlayerTeam)?.AliveCount > 0;
         /// <summary>
         /// Loadout changes are a pre-round decision. Keeping this rule on the match authority makes
         /// the later networked version a matter of validating the same state on the server.
@@ -195,6 +206,32 @@ namespace ProjectSun.FPS.Rounds
                 ConsiderTargets(defenderRoster, requester.transform.position, ref closest, ref closestDistance);
 
             return closest;
+        }
+
+        /// <summary>
+        /// 为本地死亡观战查询下一名存活队友。当前离线产品规则只允许观看己方，避免 HUD 或摄像机泄露敌方位置。
+        /// </summary>
+        /// <param name="afterSlotIndex">当前观战槽位；-1 表示选择第一名存活队友，末槽位后会循环到槽位 0。</param>
+        /// <param name="target">成功时返回同阵营存活成员；不处于可观战状态时返回 null。</param>
+        /// <returns>当前处于战斗回合、玩家已死亡且仍有存活队友时返回 true。</returns>
+        public bool TryGetNextLocalSpectatorTarget(int afterSlotIndex, out TeamCombatant target)
+        {
+            target = null;
+            if (!CanLocalPlayerSpectate) return false;
+
+            TeamRoster localRoster = GetRoster(LocalPlayerTeam);
+            return localRoster != null && localRoster.TryGetNextLivingMember(afterSlotIndex, out target);
+        }
+
+        /// <summary>将阵营枚举映射到本场比赛的只读名册。</summary>
+        /// <param name="team">要查询的阵营；None 返回 null。</param>
+        private TeamRoster GetRoster(CombatTeam team)
+        {
+            return team == CombatTeam.Attackers
+                ? attackerRoster
+                : team == CombatTeam.Defenders
+                    ? defenderRoster
+                    : null;
         }
 
         private void Start()
