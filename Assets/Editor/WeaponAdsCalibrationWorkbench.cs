@@ -18,6 +18,9 @@ namespace ProjectSun.FPS.Editor
         private const string PlayerPrefabPath = "Assets/_ProjectSun/Prefabs/Characters/Player.prefab";
         private const string LoadoutCatalogPath = "Assets/_ProjectSun/Data/Weapons/Catalogs/AR4LoadoutCatalog.asset";
         private const float ScreenTolerancePixels = 2f;
+        private const float LensPreciseTolerancePixels = 2f;
+        private const float LensReferenceWidthPixels = 1920f;
+        private const float LensReferenceHeightPixels = 1080f;
         private const float LensCentreToleranceViewport = 0.015f;
         private const float LensAxisToleranceDegrees = 3f;
         private const float LensMinimumViewportDiameter = 0.02f;
@@ -25,6 +28,7 @@ namespace ProjectSun.FPS.Editor
         private const double AttachmentPrefabAutosaveDelaySeconds = 0.45d;
 
         private enum PreviewMode { Hip, Ads, Compare }
+        private enum ScopeLensCentreGrade { Precise, Acceptable, Failed }
         private enum AttachmentSceneEditMode
         {
             None,
@@ -166,19 +170,23 @@ namespace ProjectSun.FPS.Editor
             public readonly Vector3 ViewportCentre;
             public readonly float ViewportDiameter;
             public readonly float CentreError;
+            public readonly Vector2 CentreOffsetPixels;
+            public readonly float CentrePixelError;
             public readonly float CameraAxisError;
             public readonly float SightAxisError;
             public readonly bool HasSightAxisMeasurement;
             public readonly bool IsInFrontOfCamera;
 
             public ScopeLensMeasurement(ViewmodelScopeLens lens, Vector3 viewportCentre, float viewportDiameter,
-                float centreError, float cameraAxisError, float sightAxisError, bool hasSightAxisMeasurement,
-                bool isInFrontOfCamera)
+                float centreError, Vector2 centreOffsetPixels, float centrePixelError, float cameraAxisError,
+                float sightAxisError, bool hasSightAxisMeasurement, bool isInFrontOfCamera)
             {
                 Lens = lens;
                 ViewportCentre = viewportCentre;
                 ViewportDiameter = viewportDiameter;
                 CentreError = centreError;
+                CentreOffsetPixels = centreOffsetPixels;
+                CentrePixelError = centrePixelError;
                 CameraAxisError = cameraAxisError;
                 SightAxisError = sightAxisError;
                 HasSightAxisMeasurement = hasSightAxisMeasurement;
@@ -1268,10 +1276,14 @@ namespace ProjectSun.FPS.Editor
                 assetLens != null && assetLens.OrientationAuthored && measurementValid &&
                 (!boundsMeasured || insideAttachmentBounds);
             bool ready = automaticPass && assetLens != null && assetLens.VisualPlacementReviewed;
+            ScopeLensCentreGrade centreGrade = measured
+                ? GetScopeLensCentreGrade(measurement)
+                : ScopeLensCentreGrade.Failed;
+            string centreGradeLabel = GetScopeLensCentreGradeLabel(centreGrade);
             string headline = ready
-                ? "READY：倍率镜镜片契约与人工视觉验收均已通过。"
+                ? $"READY · {centreGradeLabel}：倍率镜镜片契约与人工视觉验收均已通过。"
                 : automaticPass
-                    ? "自动契约已通过；还需确认青色边界覆盖真实后镜片。"
+                    ? $"自动契约已通过（{centreGradeLabel}）；还需确认青色边界覆盖真实后镜片。"
                     : "NOT READY：请按下方失败项处理，不要通过移动 AimAnchor 修复镜片。";
             EditorGUILayout.HelpBox(headline, ready ? MessageType.Info : MessageType.Warning);
 
@@ -1299,8 +1311,9 @@ namespace ProjectSun.FPS.Editor
                     ? $"；与 ADS 光轴 {measurement.SightAxisError:0.00}°"
                     : "；ADS 光轴尚处于兼容模式，暂不比较两条制作轴";
                 liveState =
-                    $"{(measurementValid ? "通过" : "失败")}：中心偏差 {measurement.CentreError * 100f:0.00}% " +
-                    $"/ 阈值 {LensCentreToleranceViewport * 100f:0.00}%；画面口径 {measurement.ViewportDiameter * 100f:0.0}%；" +
+                    $"{centreGradeLabel}：{FormatScopeLensCentreOffset(measurement)}（{LensReferenceWidthPixels:0}×{LensReferenceHeightPixels:0} 基准）；" +
+                    $"综合偏差 {measurement.CentreError * 100f:0.00}% / 工程阈值 {LensCentreToleranceViewport * 100f:0.00}%；" +
+                    $"画面口径 {measurement.ViewportDiameter * 100f:0.0}%；" +
                     $"镜片平面与相机 {measurement.CameraAxisError:0.00}° / 阈值 {LensAxisToleranceDegrees:0.00}°{sightAxis}";
             }
             string boundsState = !boundsMeasured
@@ -1326,6 +1339,10 @@ namespace ProjectSun.FPS.Editor
                 EditorGUILayout.HelpBox(
                     "镜片中心偏离屏幕：若青色边界已经贴合真实镜框，应调整“武器整体 ADS 姿态”；只有青色边界没有贴合镜框时才移动 LensAnchor。",
                     MessageType.Warning);
+            else if (measured && centreGrade == ScopeLensCentreGrade.Acceptable)
+                EditorGUILayout.HelpBox(
+                    $"当前已达到工程通过，但还不是精确对准。继续把 X/Y 最大偏差从 {measurement.CentrePixelError:0.00}px 调到 {LensPreciseTolerancePixels:0.00}px 以内即可显示“精确对准”。",
+                    MessageType.Info);
             if (measured && measurement.CameraAxisError > LensAxisToleranceDegrees)
                 EditorGUILayout.HelpBox(
                     "镜片平面未正对 ADS 视线：先点击播种按钮获得无跳变初值，再用“旋转镜片平面”Scene 手柄小幅修正。",
@@ -1356,6 +1373,10 @@ namespace ProjectSun.FPS.Editor
             float viewportDiameter = Mathf.Max(Mathf.Abs(rightEdge.x - centre.x) * 2f,
                 Mathf.Abs(upEdge.y - centre.y) * 2f);
             float centreError = Mathf.Max(Mathf.Abs(centre.x - 0.5f), Mathf.Abs(centre.y - 0.5f));
+            Vector2 centreOffsetPixels = new Vector2((centre.x - 0.5f) * LensReferenceWidthPixels,
+                (centre.y - 0.5f) * LensReferenceHeightPixels);
+            float centrePixelError = Mathf.Max(Mathf.Abs(centreOffsetPixels.x),
+                Mathf.Abs(centreOffsetPixels.y));
             float cameraAxisError = Quaternion.Angle(lens.transform.rotation, camera.transform.rotation);
             AdsSightReference sightReference = rig.AimAnchor != null
                 ? rig.AimAnchor.GetComponent<AdsSightReference>()
@@ -1365,7 +1386,8 @@ namespace ProjectSun.FPS.Editor
                 ? Vector3.Angle(lens.transform.forward, rig.AimAnchor.forward)
                 : 0f;
             measurement = new ScopeLensMeasurement(lens, centre, viewportDiameter, centreError,
-                cameraAxisError, sightAxisError, hasSightAxis, centre.z > camera.nearClipPlane);
+                centreOffsetPixels, centrePixelError, cameraAxisError, sightAxisError, hasSightAxis,
+                centre.z > camera.nearClipPlane);
             return true;
         }
 
@@ -1377,6 +1399,45 @@ namespace ProjectSun.FPS.Editor
                 measurement.ViewportDiameter <= LensMaximumViewportDiameter &&
                 measurement.CameraAxisError <= LensAxisToleranceDegrees &&
                 (!measurement.HasSightAxisMeasurement || measurement.SightAxisError <= LensAxisToleranceDegrees);
+        }
+
+        private static ScopeLensCentreGrade GetScopeLensCentreGrade(ScopeLensMeasurement measurement)
+        {
+            if (measurement.CentrePixelError <= LensPreciseTolerancePixels)
+                return ScopeLensCentreGrade.Precise;
+            return measurement.CentreError <= LensCentreToleranceViewport
+                ? ScopeLensCentreGrade.Acceptable
+                : ScopeLensCentreGrade.Failed;
+        }
+
+        private static string GetScopeLensCentreGradeLabel(ScopeLensCentreGrade grade)
+        {
+            switch (grade)
+            {
+                case ScopeLensCentreGrade.Precise: return "精确对准";
+                case ScopeLensCentreGrade.Acceptable: return "工程通过";
+                default: return "未通过";
+            }
+        }
+
+        private static Color GetScopeLensCentreGradeColor(ScopeLensCentreGrade grade)
+        {
+            switch (grade)
+            {
+                case ScopeLensCentreGrade.Precise: return new Color(0.25f, 1f, 0.5f, 0.95f);
+                case ScopeLensCentreGrade.Acceptable: return new Color(1f, 0.78f, 0.18f, 0.95f);
+                default: return new Color(1f, 0.28f, 0.22f, 0.95f);
+            }
+        }
+
+        private static string FormatScopeLensCentreOffset(ScopeLensMeasurement measurement)
+        {
+            float x = measurement.CentreOffsetPixels.x;
+            float y = measurement.CentreOffsetPixels.y;
+            string horizontal = Mathf.Abs(x) <= 0.005f ? "居中" : x > 0f ? "右" : "左";
+            string vertical = Mathf.Abs(y) <= 0.005f ? "居中" : y > 0f ? "上" : "下";
+            return $"X {x:+0.00;-0.00;0.00}px（{horizontal}） / " +
+                $"Y {y:+0.00;-0.00;0.00}px（{vertical}）";
         }
 
         private static bool TryGetRendererBounds(Transform root, out Bounds bounds)
@@ -1599,15 +1660,26 @@ namespace ProjectSun.FPS.Editor
                     centre.y + Mathf.Sin(angle) * radiusY, 0f);
             }
 
+            ScopeLensCentreGrade centreGrade = GetScopeLensCentreGrade(measurement);
+            Color statusColor = GetScopeLensCentreGradeColor(centreGrade);
             Handles.BeginGUI();
-            Handles.color = new Color(0.15f, 1f, 0.95f, 0.95f);
+            Handles.color = statusColor;
             Handles.DrawAAPolyLine(2.5f, points);
             Handles.DrawLine(new Vector3(centre.x - 7f, centre.y), new Vector3(centre.x + 7f, centre.y));
             Handles.DrawLine(new Vector3(centre.x, centre.y - 7f), new Vector3(centre.x, centre.y + 7f));
-            Handles.color = new Color(0.15f, 1f, 0.95f, 0.45f);
+            Handles.color = new Color(statusColor.r, statusColor.g, statusColor.b, 0.45f);
             Handles.DrawDottedLine(centre, rect.center, 3f);
             Handles.EndGUI();
-            GUI.Label(new Rect(centre.x + 8f, centre.y + 5f, 120f, 18f), "LensAnchor", EditorStyles.whiteMiniLabel);
+            float labelWidth = Mathf.Max(80f, rect.width - 8f);
+            float labelX = Mathf.Clamp(centre.x + 8f, rect.x + 4f,
+                Mathf.Max(rect.x + 4f, rect.xMax - labelWidth - 4f));
+            float labelY = Mathf.Clamp(centre.y + 5f, rect.y + 20f, rect.yMax - 20f);
+            Color oldGuiColor = GUI.color;
+            GUI.color = statusColor;
+            GUI.Label(new Rect(labelX, labelY, labelWidth, 18f),
+                $"LensAnchor · {GetScopeLensCentreGradeLabel(centreGrade)} · " +
+                FormatScopeLensCentreOffset(measurement), EditorStyles.whiteMiniLabel);
+            GUI.color = oldGuiColor;
         }
 
         private void DrawActiveOpticReticlePreview(Rect rect)
@@ -2423,15 +2495,15 @@ namespace ProjectSun.FPS.Editor
             float radius = lens.ClearApertureDiameter *
                 Mathf.Max(Mathf.Abs(lossyScale.x), Mathf.Abs(lossyScale.y)) * 0.5f;
             bool valid = IsScopeLensMeasurementValid(measurement) && lens.OrientationAuthored;
-            Handles.color = valid
-                ? new Color(0.15f, 1f, 0.78f, 0.95f)
-                : new Color(0.15f, 0.82f, 1f, 0.95f);
+            ScopeLensCentreGrade centreGrade = GetScopeLensCentreGrade(measurement);
+            Handles.color = valid ? GetScopeLensCentreGradeColor(centreGrade) : new Color(1f, 0.28f, 0.22f, 0.95f);
             Handles.DrawWireDisc(lens.transform.position, lens.transform.forward, radius);
             Handles.DrawAAPolyLine(3f, lens.transform.position,
                 lens.transform.position + lens.transform.forward * Mathf.Max(0.12f, radius * 3f));
             Handles.Label(lens.transform.position + lens.transform.up * (radius + 0.006f),
                 $" LENS · {lens.ClearApertureDiameter * 1000f:0.0}mm · " +
-                (lens.OrientationAuthored ? "AUTHORED" : "FALLBACK"));
+                (lens.OrientationAuthored ? "AUTHORED" : "FALLBACK") + " · " +
+                GetScopeLensCentreGradeLabel(centreGrade) + " · " + FormatScopeLensCentreOffset(measurement));
         }
 
         private void DrawClipProbeGuides(LowPolyShooterViewmodelRig rig, Camera camera)

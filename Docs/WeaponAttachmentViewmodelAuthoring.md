@@ -78,6 +78,8 @@ SOCKET_Scope
 
 自动报告只对可计算的契约给出通过结论：倍率镜 Profile、唯一 `ViewmodelScopeLens`、与 `AimAnchor` 共享校准根、Viewmodel Layer、ADS 屏幕中心偏差、投影口径、镜片方向、已制作 ADS 光轴夹角和模型包围盒粗检。真实镜框的孔洞形状无法仅靠 Renderer 包围盒可靠推断，因此仍保留独立人工确认，不能为了显示 READY 而随意移动镜片。
 
+中心偏差统一换算为 `1920×1080` 参考像素，并显示带方向的 X/Y 数值：正 X 表示偏右，负 X 表示偏左，正 Y 表示偏上，负 Y 表示偏下。最大轴偏差不超过 `2px` 显示 **精确对准**；超过 `2px` 但仍处于镜片工程容差内显示 **工程通过**；超出工程容差显示 **未通过**。窗口尺寸不会改变该分级结果。
+
 ## 动态配件校准
 
 通过 `Project Sun/Tools/Weapon Presentation Workbench` 选择 Player、武器槽位和 **校准瞄具**。工作台会创建临时 Loadout，并在源预览与两份隔离相机预览中调用与游戏一致的 `WeaponAttachmentViewmodelPresenter` 装配链路；停止预览后会销毁临时外观并恢复 Player 原生部件，不会把预览对象写入 Player 预制体。
