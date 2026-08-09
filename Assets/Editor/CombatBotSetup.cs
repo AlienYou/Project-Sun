@@ -41,7 +41,7 @@ namespace ProjectSun.FPS.Editor
             EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
             EditorUtility.DisplayDialog("Project Sun",
-                "6v6 team elimination roster is ready: Player + 5 attackers versus 6 defenders. Press Play to validate the round loop.",
+                "6v6 team elimination roster and deterministic spawn groups are ready: Player + 5 attackers versus 6 defenders. Press Play to validate the round loop.",
                 "OK");
         }
 
@@ -49,6 +49,8 @@ namespace ProjectSun.FPS.Editor
         [MenuItem("Project Sun/Add Defender Bots To Combat Slice", priority = 15)]
         public static void AddDefenders() => SetupTeamElimination();
 
+        /// <summary>创建或修复 6v6 Bot 阵容、稳定名册槽位与双方出生点组。</summary>
+        /// <param name="combatSliceRoot">Combat Slice 场景根节点；缺少 Environment 或 Player 时不做修改。</param>
         public static void CreateCombatBots(Transform combatSliceRoot)
         {
             Transform environment = combatSliceRoot.Find("Environment");
@@ -68,6 +70,14 @@ namespace ProjectSun.FPS.Editor
             // The human player is the sixth attacker in the local validation roster.
             EnsureTeamBots(attackerRoot, TeamSize - 1, CombatTeam.Attackers, AttackerPositions(), botPrefab, player, coverPoints);
             EnsureTeamBots(defenderRoot, TeamSize, CombatTeam.Defenders, DefenderPositions(), botPrefab, player, coverPoints);
+
+            TeamCombatant playerCombatant = player.GetComponent<TeamCombatant>();
+            if (playerCombatant == null) playerCombatant = Undo.AddComponent<TeamCombatant>(player.gameObject);
+            Undo.RecordObject(playerCombatant, "Assign Player Team Slot");
+            playerCombatant.AssignTeamSlot(CombatTeam.Attackers, 0);
+            EditorUtility.SetDirty(playerCombatant);
+
+            CreateTeamSpawnGroups(combatSliceRoot, player, attackerRoot, defenderRoot);
         }
 
         private static void EnsureTeamBots(Transform teamRoot, int desiredCount, CombatTeam team, Vector3[] spawnPositions,
@@ -77,12 +87,14 @@ namespace ProjectSun.FPS.Editor
             for (int index = existing.Length; index < desiredCount; index++)
             {
                 GameObject botObject = (GameObject)PrefabUtility.InstantiatePrefab(botPrefab);
+                Undo.RegisterCreatedObjectUndo(botObject, "Create Team Elimination Bot");
                 botObject.name = team == CombatTeam.Attackers ? $"Attacker {index + 1:00}" : $"Defender {index + 1:00}";
                 botObject.transform.SetParent(teamRoot);
                 botObject.transform.position = spawnPositions[Mathf.Min(index, spawnPositions.Length - 1)];
             }
 
             CombatBotController[] configuredBots = teamRoot.GetComponentsInChildren<CombatBotController>(true);
+            System.Array.Sort(configuredBots, (left, right) => string.CompareOrdinal(left.name, right.name));
             for (int index = 0; index < configuredBots.Length; index++)
             {
                 CombatBotController bot = configuredBots[index];
@@ -92,12 +104,76 @@ namespace ProjectSun.FPS.Editor
                 bot.SetCoverPoints(coverPoints);
 
                 TeamCombatant combatant = bot.GetComponent<TeamCombatant>();
-                if (combatant == null) combatant = bot.gameObject.AddComponent<TeamCombatant>();
-                combatant.SetTeam(team);
+                if (combatant == null) combatant = Undo.AddComponent<TeamCombatant>(bot.gameObject);
+                Undo.RecordObject(combatant, "Assign Bot Team Slot");
+                int rosterSlot = team == CombatTeam.Attackers ? index + 1 : index;
+                combatant.AssignTeamSlot(team, rosterSlot);
                 ApplyTeamMaterial(bot, team);
                 EditorUtility.SetDirty(bot);
                 EditorUtility.SetDirty(combatant);
             }
+        }
+
+        private static void CreateTeamSpawnGroups(Transform combatSliceRoot, Transform player, Transform attackerRoot,
+            Transform defenderRoot)
+        {
+            Transform spawnRoot = GetOrCreateChild(combatSliceRoot, "Team Spawn Groups");
+            CombatBotController[] attackerBots = attackerRoot.GetComponentsInChildren<CombatBotController>(true);
+            CombatBotController[] defenderBots = defenderRoot.GetComponentsInChildren<CombatBotController>(true);
+            System.Array.Sort(attackerBots, (left, right) => string.CompareOrdinal(left.name, right.name));
+            System.Array.Sort(defenderBots, (left, right) => string.CompareOrdinal(left.name, right.name));
+            Vector3[] defaultAttackerPositions = AttackerPositions();
+            Vector3[] defaultDefenderPositions = DefenderPositions();
+
+            Pose[] attackerPoses = new Pose[TeamSize];
+            attackerPoses[0] = new Pose(player.position, player.rotation);
+            for (int slotIndex = 1; slotIndex < TeamSize; slotIndex++)
+            {
+                CombatBotController bot = slotIndex - 1 < attackerBots.Length ? attackerBots[slotIndex - 1] : null;
+                Vector3 fallbackPosition = defaultAttackerPositions[Mathf.Min(slotIndex - 1, defaultAttackerPositions.Length - 1)];
+                attackerPoses[slotIndex] = bot != null
+                    ? new Pose(bot.transform.position, bot.transform.rotation)
+                    : new Pose(fallbackPosition, Quaternion.identity);
+            }
+
+            Pose[] defenderPoses = new Pose[TeamSize];
+            for (int slotIndex = 0; slotIndex < TeamSize; slotIndex++)
+            {
+                CombatBotController bot = slotIndex < defenderBots.Length ? defenderBots[slotIndex] : null;
+                Vector3 fallbackPosition = defaultDefenderPositions[Mathf.Min(slotIndex, defaultDefenderPositions.Length - 1)];
+                defenderPoses[slotIndex] = bot != null
+                    ? new Pose(bot.transform.position, bot.transform.rotation)
+                    : new Pose(fallbackPosition, Quaternion.Euler(0f, 180f, 0f));
+            }
+
+            EnsureSpawnGroup(spawnRoot, "Attacker Spawn Group", CombatTeam.Attackers, attackerPoses);
+            EnsureSpawnGroup(spawnRoot, "Defender Spawn Group", CombatTeam.Defenders, defenderPoses);
+        }
+
+        private static void EnsureSpawnGroup(Transform parent, string groupName, CombatTeam team, Pose[] initialPoses)
+        {
+            Transform groupRoot = GetOrCreateChild(parent, groupName);
+            TeamSpawnGroup group = groupRoot.GetComponent<TeamSpawnGroup>();
+            if (group == null) group = Undo.AddComponent<TeamSpawnGroup>(groupRoot.gameObject);
+
+            Transform[] anchors = new Transform[initialPoses.Length];
+            for (int slotIndex = 0; slotIndex < initialPoses.Length; slotIndex++)
+            {
+                string anchorName = $"Slot {slotIndex:00}";
+                Transform existing = groupRoot.Find(anchorName);
+                bool created = existing == null;
+                Transform anchor = created ? GetOrCreateChild(groupRoot, anchorName) : existing;
+                if (created)
+                {
+                    // 只在首次创建时播种位置；再次执行工具必须保留关卡设计师手工调整后的出生姿态。
+                    anchor.SetPositionAndRotation(initialPoses[slotIndex].position, initialPoses[slotIndex].rotation);
+                }
+                anchors[slotIndex] = anchor;
+            }
+
+            Undo.RecordObject(group, "Configure Team Spawn Group");
+            group.Configure(team, anchors);
+            EditorUtility.SetDirty(group);
         }
 
         private static Vector3[] AttackerPositions() => new[]
@@ -117,6 +193,7 @@ namespace ProjectSun.FPS.Editor
             Transform child = parent.Find(childName);
             if (child != null) return child;
             GameObject childObject = new GameObject(childName);
+            Undo.RegisterCreatedObjectUndo(childObject, $"Create {childName}");
             childObject.transform.SetParent(parent);
             return childObject.transform;
         }

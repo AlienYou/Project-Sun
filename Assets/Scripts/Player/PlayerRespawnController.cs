@@ -10,7 +10,9 @@ namespace ProjectSun.FPS.Player
     [RequireComponent(typeof(Health), typeof(CharacterController), typeof(FpsPlayerController))]
     public sealed class PlayerRespawnController : MonoBehaviour
     {
-        [SerializeField, Min(0.5f)] private float respawnSeconds = 3f;
+        [SerializeField, Min(0.5f)]
+        [Tooltip("训练模式死亡后的自动复活等待时间，单位为秒；竞技回合会关闭局中复活，因此该值不影响团队歼灭。")]
+        private float respawnSeconds = 3f;
         private Health health;
         private CharacterController characterController;
         private FpsPlayerController player;
@@ -47,8 +49,20 @@ namespace ProjectSun.FPS.Player
             if (roundRespawnsEnabled) StartCoroutine(RespawnRoutine());
         }
 
-        /// <summary>Round mode disables mid-round respawns while preserving this component for training mode.</summary>
+        /// <summary>设置是否允许训练模式的局中自动复活；团队歼灭在回合开始时关闭它。</summary>
+        /// <param name="enabled">true 允许按等待时间复活；false 时死亡后保持淘汰直到下一回合重置。</param>
         public void SetRoundRespawnsEnabled(bool enabled) => roundRespawnsEnabled = enabled;
+
+        /// <summary>
+        /// 更新后续回合与训练复活使用的权威出生姿态。这里只保存数据，实际移动统一发生在重置流程中，
+        /// 避免配置阶段绕过 CharacterController 的安全开关。
+        /// </summary>
+        /// <param name="spawnPose">世界空间出生位置和朝向，由阵营槽位对应的 TeamSpawnGroup 提供。</param>
+        public void SetRoundSpawn(Pose spawnPose)
+        {
+            spawnPosition = spawnPose.position;
+            spawnRotation = spawnPose.rotation;
+        }
 
         public void ResetForRound()
         {

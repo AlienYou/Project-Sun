@@ -13,21 +13,34 @@ namespace ProjectSun.FPS.AI
     public sealed class CombatBotController : MonoBehaviour
     {
         [Header("Combat")]
-        [SerializeField, Min(1f)] private float detectionRange = 20f;
-        [SerializeField, Min(1f)] private float preferredRange = 11f;
-        [SerializeField, Min(0.1f)] private float shotsPerSecond = 1.25f;
-        [SerializeField, Min(1f)] private float shotDamage = 8f;
+        [SerializeField, Min(1f), Tooltip("Bot 可尝试发现并射击目标的最大距离，单位为米，必须大于等于 1。")]
+        private float detectionRange = 20f;
+        [SerializeField, Min(1f), Tooltip("Bot 希望保持的交战距离，单位为米；超出后会追击目标。")]
+        private float preferredRange = 11f;
+        [SerializeField, Min(0.1f), Tooltip("Bot 每秒射击次数，必须大于零；当前离线验证不模拟弹匣。")]
+        private float shotsPerSecond = 1.25f;
+        [SerializeField, Min(1f), Tooltip("单次命中造成的基础伤害，单位为生命值。")]
+        private float shotDamage = 8f;
         [Header("Patrol")]
-        [SerializeField, Min(0.5f)] private float patrolRadius = 4f;
-        [SerializeField, Min(0.5f)] private float patrolInterval = 3.5f;
+        [SerializeField, Min(0.5f), Tooltip("无目标时围绕本回合出生点巡逻的半径，单位为米。")]
+        private float patrolRadius = 4f;
+        [SerializeField, Min(0.5f), Tooltip("重新选择巡逻目的地的最短间隔，单位为秒。")]
+        private float patrolInterval = 3.5f;
         [Header("Respawn")]
-        [SerializeField, Min(0.5f)] private float respawnSeconds = 5f;
-        [SerializeField] private Transform player;
-        [SerializeField] private ObjectiveZone[] defendedObjectives = System.Array.Empty<ObjectiveZone>();
-        [SerializeField] private Vector3 guardPosition;
-        [SerializeField] private CombatCoverPoint[] coverPoints = System.Array.Empty<CombatCoverPoint>();
-        [SerializeField, Min(0.5f)] private float coverSearchRadius = 18f;
-        [SerializeField, Min(0.1f)] private float coverArrivalDistance = 0.55f;
+        [SerializeField, Min(0.5f), Tooltip("训练模式死亡后的复活等待时间，单位为秒；团队歼灭回合会关闭局中复活。")]
+        private float respawnSeconds = 5f;
+        [SerializeField, Tooltip("旧训练场兼容目标；存在 RoundManager 时会按敌方阵营名册动态替换。")]
+        private Transform player;
+        [SerializeField, Tooltip("旧攻防验证目标集合；团队歼灭模式不以该数组决定胜负。")]
+        private ObjectiveZone[] defendedObjectives = System.Array.Empty<ObjectiveZone>();
+        [SerializeField, Tooltip("未配置 TeamSpawnGroup 时使用的巡逻与复活基准位置，单位为世界空间米。")]
+        private Vector3 guardPosition;
+        [SerializeField, Tooltip("允许该 Bot 竞争使用的战术掩体点；由场景安装器在初始化阶段一次性写入。")]
+        private CombatCoverPoint[] coverPoints = System.Array.Empty<CombatCoverPoint>();
+        [SerializeField, Min(0.5f), Tooltip("寻找可用掩体的最大距离，单位为米。")]
+        private float coverSearchRadius = 18f;
+        [SerializeField, Min(0.1f), Tooltip("判定到达掩体或探身点的距离阈值，单位为米。")]
+        private float coverArrivalDistance = 0.55f;
 
         private NavMeshAgent agent;
         private Health health;
@@ -45,12 +58,17 @@ namespace ProjectSun.FPS.AI
         private CombatCoverPoint currentCover;
         private bool movingToPeek;
         private RoundManager roundManager;
+        private Quaternion spawnRotation;
 
         public bool IsAlive => health != null && health.IsAlive;
         public string DebugState => currentCover != null ? $"{debugState} [{currentCover.name}]" : debugState;
         public string LatestRayResult => latestRayResult;
         public float TargetDistance => targetDistance;
 
+        /// <summary>配置旧场景训练目标、目标区与巡逻基准。</summary>
+        /// <param name="playerTransform">旧训练模式固定目标；团队回合中会替换为最近的存活敌人。</param>
+        /// <param name="objectives">Bot 需要防守的目标区；null 按空数组处理。</param>
+        /// <param name="guardPoint">世界空间巡逻和兼容复活基准，单位为米。</param>
         public void Configure(Transform playerTransform, ObjectiveZone[] objectives, Vector3 guardPoint)
         {
             player = playerTransform;
@@ -58,8 +76,12 @@ namespace ProjectSun.FPS.AI
             guardPosition = guardPoint;
         }
 
+        /// <summary>替换该 Bot 可使用的掩体集合。</summary>
+        /// <param name="points">场景中的候选掩体；null 按空数组处理，调用方应在初始化阶段一次性配置。</param>
         public void SetCoverPoints(CombatCoverPoint[] points) => coverPoints = points ?? System.Array.Empty<CombatCoverPoint>();
 
+        /// <summary>启用或停用 Bot 的移动与射击决策。</summary>
+        /// <param name="enabled">true 允许执行战斗 AI；false 会停止导航并释放已占用掩体。</param>
         public void SetCombatEnabled(bool enabled)
         {
             combatEnabled = enabled;
@@ -73,7 +95,20 @@ namespace ProjectSun.FPS.AI
                 Patrol();
         }
 
+        /// <summary>设置训练模式是否允许死亡后自动复活。</summary>
+        /// <param name="enabled">true 允许延迟复活；false 时保持淘汰直到 RoundManager 重置回合。</param>
         public void SetRoundRespawnsEnabled(bool enabled) => roundRespawnsEnabled = enabled;
+
+        /// <summary>
+        /// 更新该 Bot 后续重置、训练复活和巡逻使用的出生姿态。实际传送发生在重置流程，
+        /// 以便先安全停用 NavMeshAgent，再将位置投影到可行走表面。
+        /// </summary>
+        /// <param name="spawnPose">世界空间出生位置与朝向，由稳定阵营槽位对应的出生点提供。</param>
+        public void SetRoundSpawn(Pose spawnPose)
+        {
+            guardPosition = spawnPose.position;
+            spawnRotation = spawnPose.rotation;
+        }
 
         public void ResetForRound()
         {
@@ -88,6 +123,7 @@ namespace ProjectSun.FPS.AI
                 transform.position = hit.position;
             else
                 transform.position = guardPosition;
+            transform.rotation = spawnRotation;
             health.ResetHealth();
             foreach (Collider currentCollider in colliders) currentCollider.enabled = true;
             foreach (Renderer currentRenderer in renderers) currentRenderer.enabled = true;
@@ -101,6 +137,7 @@ namespace ProjectSun.FPS.AI
             health = GetComponent<Health>();
             colliders = GetComponentsInChildren<Collider>();
             renderers = GetComponentsInChildren<Renderer>();
+            spawnRotation = transform.rotation;
             health.Died += OnDied;
         }
 
@@ -333,6 +370,7 @@ namespace ProjectSun.FPS.AI
                 transform.position = hit.position;
             else
                 transform.position = guardPosition;
+            transform.rotation = spawnRotation;
             health.ResetHealth();
             foreach (Collider currentCollider in colliders) currentCollider.enabled = true;
             foreach (Renderer currentRenderer in renderers) currentRenderer.enabled = true;
