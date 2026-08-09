@@ -53,7 +53,7 @@ namespace ProjectSun.FPS.UI
                 : lastHitName;
 
             GUI.Label(new Rect(panel.x + 14f, panel.y + 12f, panel.width - 28f, 25f), "WEAPON LAB // LIVE TELEMETRY", titleStyle);
-            GUI.Label(new Rect(panel.x + 14f, panel.y + 43f, panel.width - 28f, 164f),
+            GUI.Label(new Rect(panel.x + 14f, panel.y + 43f, panel.width - 28f, 126f),
                 $"Weapon      {weaponName}\n" +
                 $"Slot        {slot}\n" +
                 $"State       {aimState}\n" +
@@ -62,8 +62,17 @@ namespace ProjectSun.FPS.UI
                 $"Spread      HIP {stats.hipSpread:0.00}  ADS {stats.aimSpread:0.00}\n" +
                 $"Range       {stats.range:0}m\n" +
                 $"Last hit    {hitState}", bodyStyle);
+            string quality = lab != null ? lab.CurrentQualityName.ToUpperInvariant() : "UNKNOWN";
+            string validation = lab != null
+                ? $"{lab.ValidationStatus}  {lab.ValidationProgress:P0}"
+                : "NOT AVAILABLE";
+            GUI.Label(new Rect(panel.x + 14f, panel.y + 170f, panel.width - 28f, 18f),
+                $"Quality     {quality}", bodyStyle);
+            GUI.Label(new Rect(panel.x + 14f, panel.y + 188f, panel.width - 28f, 18f),
+                $"Scope soak  {validation}", bodyStyle);
             GUI.Label(new Rect(panel.x + 14f, panel.yMax - 24f, panel.width - 28f, 18f),
-                $"[{(lab != null ? lab.ResetLabKey : KeyCode.F6)}] RESET LAB", bodyStyle);
+                $"[{(lab != null ? lab.ResetLabKey : KeyCode.F6)}] RESET  " +
+                $"[{(lab != null ? lab.ScopeValidationKey : KeyCode.F7)}] SCOPE SOAK", bodyStyle);
 
             DrawScopeDiagnostics(width, panel.yMax + 10f);
         }
