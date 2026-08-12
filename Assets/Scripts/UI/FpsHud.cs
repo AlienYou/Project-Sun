@@ -1,6 +1,7 @@
 using ProjectSun.FPS.Abilities;
 using ProjectSun.FPS.Core;
 using ProjectSun.FPS.Presentation;
+using ProjectSun.FPS.Player;
 using ProjectSun.FPS.Rounds;
 using ProjectSun.FPS.Weapons;
 using UnityEngine;
@@ -20,6 +21,7 @@ namespace ProjectSun.FPS.UI
         private FpsAbilityController abilities;
         private Health health;
         private RoundManager roundManager;
+        private PlayerSpectatorController spectatorController;
         private FpsTacticalEquipmentController tacticalEquipment;
         private ScopeSightRenderer scopeSightRenderer;
         private WeaponAttachmentViewmodelPresenter attachmentPresenter;
@@ -39,8 +41,10 @@ namespace ProjectSun.FPS.UI
         /// <param name="playerHealth">本地玩家权威生命组件，不能为空。</param>
         /// <param name="combatRoundManager">团队对局权威；null 时显示训练场 HUD。</param>
         /// <param name="playerTacticalEquipment">本地玩家战术装备控制器；null 时隐藏装备状态。</param>
+        /// <param name="playerSpectatorController">死亡观战表现控制器；null 时仅显示等待状态，不显示相机目标。</param>
         public void Configure(HitscanWeapon hitscanWeapon, FpsAbilityController abilityController, Health playerHealth,
-            RoundManager combatRoundManager = null, FpsTacticalEquipmentController playerTacticalEquipment = null)
+            RoundManager combatRoundManager = null, FpsTacticalEquipmentController playerTacticalEquipment = null,
+            PlayerSpectatorController playerSpectatorController = null)
         {
             if (weapon != null) weapon.HitConfirmed -= ShowHitMarker;
             if (health != null) health.Damaged -= ShowDamageWarning;
@@ -49,6 +53,7 @@ namespace ProjectSun.FPS.UI
             health = playerHealth;
             roundManager = combatRoundManager;
             tacticalEquipment = playerTacticalEquipment;
+            spectatorController = playerSpectatorController;
             attachmentPresenter = null;
             if (weapon != null) weapon.HitConfirmed += ShowHitMarker;
             if (health != null) health.Damaged += ShowDamageWarning;
@@ -297,14 +302,18 @@ namespace ProjectSun.FPS.UI
                 "YOU ARE ELIMINATED", overlayTitleStyle);
 
             string waitingMessage;
-            if (roundManager.CanLocalPlayerSpectate &&
-                roundManager.TryGetNextLocalSpectatorTarget(-1, out TeamCombatant target))
+            if (spectatorController != null && spectatorController.IsSpectating &&
+                spectatorController.CurrentTarget != null)
             {
-                TeamRoster localRoster = roundManager.LocalPlayerTeam == CombatTeam.Attackers
-                    ? roundManager.AttackerRoster
-                    : roundManager.DefenderRoster;
-                waitingMessage = $"WAITING FOR ROUND END  //  TEAM ALIVE {localRoster.AliveCount}\n" +
-                                 $"SPECTATOR TARGET READY: {target.name.ToUpperInvariant()}";
+                waitingMessage = $"SPECTATING  {spectatorController.CurrentTarget.name.ToUpperInvariant()}\n" +
+                                 $"[{spectatorController.PreviousBindingDisplayName}] PREVIOUS    " +
+                                 $"[{spectatorController.NextBindingDisplayName}] NEXT";
+            }
+            else if (roundManager.CanLocalPlayerSpectate &&
+                     roundManager.TryGetNextLocalSpectatorTarget(-1, out TeamCombatant pendingTarget))
+            {
+                waitingMessage = $"WAITING FOR ROUND END\nSPECTATOR TARGET READY: " +
+                                 pendingTarget.name.ToUpperInvariant();
             }
             else if (roundManager.State == RoundState.Active)
             {

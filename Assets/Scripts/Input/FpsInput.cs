@@ -27,7 +27,9 @@ namespace ProjectSun.FPS.Input
         Loadout,
         Settings,
         Menu,
-        DebugCombat
+        DebugCombat,
+        SpectateNext,
+        SpectatePrevious
     }
 
     /// <summary>
@@ -44,7 +46,7 @@ namespace ProjectSun.FPS.Input
         private const string FieldOfViewKey = "ProjectSun.Video.FieldOfView";
         private const string BindingOverridesKey = "ProjectSun.Input.BindingOverrides";
         private const string BindingOverridesFormatPrefix = "PS_BINDINGS_V1;";
-        private const int BindingCount = (int)FpsBinding.DebugCombat + 1;
+        private const int BindingCount = (int)FpsBinding.SpectatePrevious + 1;
 
         [Header("Defaults")]
         [Tooltip("鼠标视角灵敏度；有效范围 0.02～0.5，运行时会读取玩家本地设置覆盖该默认值。")]
@@ -71,6 +73,8 @@ namespace ProjectSun.FPS.Input
         private InputAction settings;
         private InputAction menu;
         private InputAction debugCombat;
+        private InputAction spectateNext;
+        private InputAction spectatePrevious;
         private InputActionRebindingExtensions.RebindingOperation rebindingOperation;
         private readonly bool[] testHeldBindings = new bool[BindingCount];
         private bool testInputOverrideActive;
@@ -234,6 +238,8 @@ namespace ProjectSun.FPS.Input
             settings = gameplayMap.AddAction("Settings", InputActionType.Button, "<Keyboard>/o");
             menu = gameplayMap.AddAction("Menu", InputActionType.Button, "<Keyboard>/escape");
             debugCombat = gameplayMap.AddAction("DebugCombat", InputActionType.Button, "<Keyboard>/f10");
+            spectateNext = gameplayMap.AddAction("Spectate Next", InputActionType.Button, "<Keyboard>/rightArrow");
+            spectatePrevious = gameplayMap.AddAction("Spectate Previous", InputActionType.Button, "<Keyboard>/leftArrow");
         }
 
         private void LoadPersistedSettings()
@@ -351,6 +357,8 @@ namespace ProjectSun.FPS.Input
                 case FpsBinding.Settings: return settings;
                 case FpsBinding.Menu: return menu;
                 case FpsBinding.DebugCombat: return debugCombat;
+                case FpsBinding.SpectateNext: return spectateNext;
+                case FpsBinding.SpectatePrevious: return spectatePrevious;
                 default: return null;
             }
         }

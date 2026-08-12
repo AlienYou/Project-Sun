@@ -130,10 +130,33 @@ namespace ProjectSun.FPS.Rounds
         /// <returns>至少找到一名已注册且存活的成员时返回 true。</returns>
         public bool TryGetNextLivingMember(int afterSlotIndex, out TeamCombatant member)
         {
-            int normalizedSlot = afterSlotIndex >= -1 && afterSlotIndex < slots.Length ? afterSlotIndex : -1;
+            return TryGetLivingMember(afterSlotIndex, 1, out member);
+        }
+
+        /// <summary>
+        /// 按稳定槽位反向循环查找上一名存活成员，用于观战界面的反向切换。
+        /// </summary>
+        /// <param name="beforeSlotIndex">从该槽位之前开始查找；-1 或越界表示从末槽位开始。</param>
+        /// <param name="member">成功时返回上一名存活成员；没有存活成员时返回 null。</param>
+        /// <returns>至少找到一名已注册且存活的成员时返回 true。</returns>
+        public bool TryGetPreviousLivingMember(int beforeSlotIndex, out TeamCombatant member)
+        {
+            return TryGetLivingMember(beforeSlotIndex, -1, out member);
+        }
+
+        /// <summary>按指定方向循环查询存活成员，正数向后、负数向前。</summary>
+        /// <param name="referenceSlotIndex">当前参考槽位；越界时从对应方向的边界开始。</param>
+        /// <param name="direction">只接受 1 或 -1，分别表示槽位递增和递减。</param>
+        /// <param name="member">成功时返回找到的存活成员；失败时返回 null。</param>
+        private bool TryGetLivingMember(int referenceSlotIndex, int direction, out TeamCombatant member)
+        {
+            int normalizedSlot = referenceSlotIndex >= 0 && referenceSlotIndex < slots.Length
+                ? referenceSlotIndex
+                : direction > 0 ? -1 : 0;
             for (int offset = 1; offset <= slots.Length; offset++)
             {
-                int slotIndex = (normalizedSlot + offset) % slots.Length;
+                int slotIndex = (normalizedSlot + direction * offset) % slots.Length;
+                if (slotIndex < 0) slotIndex += slots.Length;
                 TeamCombatant candidate = slots[slotIndex];
                 if (candidate == null || !candidate.IsAlive) continue;
                 member = candidate;

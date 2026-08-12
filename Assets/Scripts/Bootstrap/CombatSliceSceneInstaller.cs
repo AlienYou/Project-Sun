@@ -3,6 +3,7 @@ using ProjectSun.FPS.Core;
 using ProjectSun.FPS.Weapons;
 using ProjectSun.FPS.Rounds;
 using ProjectSun.FPS.AI;
+using ProjectSun.FPS.Player;
 using UnityEngine;
 
 namespace ProjectSun.FPS.Bootstrap
@@ -68,22 +69,26 @@ namespace ProjectSun.FPS.Bootstrap
             // FindObjectsOfType 不保证返回顺序；名称排序让数组顺序稳定映射到队伍槽位与出生点。
             attackers.Sort((left, right) => string.CompareOrdinal(left.name, right.name));
             defenders.Sort((left, right) => string.CompareOrdinal(left.name, right.name));
+            PlayerSpectatorController spectatorController = null;
             if (roundManager != null)
             {
                 TeamSpawnGroup[] spawnGroups = FindObjectsOfType<TeamSpawnGroup>();
                 System.Array.Sort(spawnGroups, (left, right) => string.CompareOrdinal(left.name, right.name));
                 roundManager.ConfigureSpawnGroups(spawnGroups);
                 roundManager.ConfigureCombatants(playerInstaller, attackers.ToArray(), defenders.ToArray());
+                spectatorController = GetComponent<PlayerSpectatorController>();
+                if (spectatorController == null) spectatorController = gameObject.AddComponent<PlayerSpectatorController>();
+                spectatorController.Configure(roundManager, playerInstaller.PlayerCamera, playerInstaller.Player.Input);
             }
             if (hud != null)
                 hud.Configure(playerInstaller.Weapon, playerInstaller.Abilities, playerInstaller.Health, roundManager,
-                    playerInstaller.TacticalEquipment);
+                    playerInstaller.TacticalEquipment, spectatorController);
             if (customization != null)
                 customization.Configure(playerInstaller.Weapon, playerInstaller.Player, playerInstaller.Abilities, loadoutCatalog,
                     roundManager, playerInstaller.MatchLoadout);
             FpsSettingsMenu settings = GetComponent<FpsSettingsMenu>();
             if (settings == null) settings = gameObject.AddComponent<FpsSettingsMenu>();
-            settings.Configure(playerInstaller.Player, playerInstaller.Weapon, playerInstaller.Abilities);
+            settings.Configure(playerInstaller.Player, playerInstaller.Weapon, playerInstaller.Abilities, roundManager);
             CombatRayDebugOverlay debugOverlay = GetComponent<CombatRayDebugOverlay>();
             if (debugOverlay == null) debugOverlay = gameObject.AddComponent<CombatRayDebugOverlay>();
             debugOverlay.Configure(playerInstaller.Player, playerInstaller.Health, roundManager, allBots);

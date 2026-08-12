@@ -95,6 +95,10 @@ namespace ProjectSun.FPS.Editor.Tests
                 Assert.That(afterFirst, Is.SameAs(last));
                 Assert.That(roster.TryGetNextLivingMember(5, out TeamCombatant wrapped), Is.True);
                 Assert.That(wrapped, Is.SameAs(first));
+                Assert.That(roster.TryGetPreviousLivingMember(0, out TeamCombatant previousWrapped), Is.True);
+                Assert.That(previousWrapped, Is.SameAs(last));
+                Assert.That(roster.TryGetPreviousLivingMember(5, out TeamCombatant beforeLast), Is.True);
+                Assert.That(beforeLast, Is.SameAs(first));
             }
             finally
             {

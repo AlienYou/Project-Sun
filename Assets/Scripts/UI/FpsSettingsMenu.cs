@@ -1,6 +1,7 @@
 using ProjectSun.FPS.Abilities;
 using ProjectSun.FPS.Input;
 using ProjectSun.FPS.Player;
+using ProjectSun.FPS.Rounds;
 using ProjectSun.FPS.Weapons;
 using UnityEngine;
 
@@ -14,25 +15,34 @@ namespace ProjectSun.FPS.UI
             FpsBinding.MoveForward, FpsBinding.MoveBackward, FpsBinding.MoveLeft, FpsBinding.MoveRight,
             FpsBinding.Fire, FpsBinding.Aim, FpsBinding.Jump, FpsBinding.Sprint, FpsBinding.Crouch,
             FpsBinding.Reload, FpsBinding.SelectPrimary, FpsBinding.SelectSecondary, FpsBinding.Dash, FpsBinding.Focus,
-            FpsBinding.Interact, FpsBinding.UseTactical, FpsBinding.Loadout
+            FpsBinding.Interact, FpsBinding.UseTactical, FpsBinding.Loadout,
+            FpsBinding.SpectateNext, FpsBinding.SpectatePrevious
         };
 
         private FpsPlayerController player;
         private HitscanWeapon weapon;
         private FpsAbilityController abilities;
         private FpsInput input;
+        private RoundManager roundManager;
         private bool isOpen;
         private string rebindStatus;
         private GUIStyle titleStyle;
         private GUIStyle bodyStyle;
         private GUIStyle buttonStyle;
 
-        public void Configure(FpsPlayerController controller, HitscanWeapon hitscanWeapon, FpsAbilityController abilityController)
+        /// <summary>配置设置菜单及其输入阻塞归属。</summary>
+        /// <param name="controller">本地玩家控制器，不能为空。</param>
+        /// <param name="hitscanWeapon">本地武器控制器，不能为空。</param>
+        /// <param name="abilityController">本地技能控制器，不能为空。</param>
+        /// <param name="matchRoundManager">团队对局权威；null 表示训练模式并沿用直接暂停组件的兼容路径。</param>
+        public void Configure(FpsPlayerController controller, HitscanWeapon hitscanWeapon,
+            FpsAbilityController abilityController, RoundManager matchRoundManager = null)
         {
             player = controller;
             weapon = hitscanWeapon;
             abilities = abilityController;
             input = player != null ? player.Input : null;
+            roundManager = matchRoundManager;
         }
 
         private void Update()
@@ -40,6 +50,11 @@ namespace ProjectSun.FPS.UI
             if (input == null) return;
             if (!input.IsRebinding && input.WasPressed(FpsBinding.Settings)) SetOpen(!isOpen);
             if (isOpen && !input.IsRebinding && input.WasPressed(FpsBinding.Menu)) SetOpen(false);
+        }
+
+        private void OnDisable()
+        {
+            if (isOpen) SetOpen(false);
         }
 
         private void OnGUI()
@@ -105,6 +120,12 @@ namespace ProjectSun.FPS.UI
         private void SetOpen(bool open)
         {
             isOpen = open;
+            if (roundManager != null)
+            {
+                // 对局模式只能向规则权威声明菜单阻塞；是否恢复输入仍由回合和生命状态共同决定。
+                roundManager.SetPlayerMenuBlocked(open);
+                return;
+            }
             if (player != null) player.SetGameplayInputEnabled(!open);
             if (weapon != null) weapon.SetGameplayInputEnabled(!open);
             if (abilities != null) abilities.SetGameplayInputEnabled(!open);
@@ -121,6 +142,8 @@ namespace ProjectSun.FPS.UI
                 case FpsBinding.SelectPrimary: return "SELECT PRIMARY";
                 case FpsBinding.SelectSecondary: return "SELECT SECONDARY";
                 case FpsBinding.UseTactical: return "USE TACTICAL";
+                case FpsBinding.SpectateNext: return "SPECTATE NEXT";
+                case FpsBinding.SpectatePrevious: return "SPECTATE PREVIOUS";
                 default: return binding.ToString().ToUpperInvariant();
             }
         }

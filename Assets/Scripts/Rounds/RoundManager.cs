@@ -58,6 +58,8 @@ namespace ProjectSun.FPS.Rounds
         private TeamCombatant playerCombatant;
         private TeamRoster attackerRoster;
         private TeamRoster defenderRoster;
+        private bool roundGameplayRequested;
+        private bool playerMenuBlocked;
         private int attackerRounds;
         private int defenderRounds;
 
@@ -223,6 +225,30 @@ namespace ProjectSun.FPS.Rounds
             return localRoster != null && localRoster.TryGetNextLivingMember(afterSlotIndex, out target);
         }
 
+        /// <summary>为本地死亡观战反向查询上一名合法的己方存活成员。</summary>
+        /// <param name="beforeSlotIndex">当前观战槽位；-1 表示从名册末槽位开始。</param>
+        /// <param name="target">成功时返回同阵营存活成员；不处于可观战状态时返回 null。</param>
+        /// <returns>当前处于战斗回合、玩家已死亡且仍有存活队友时返回 true。</returns>
+        public bool TryGetPreviousLocalSpectatorTarget(int beforeSlotIndex, out TeamCombatant target)
+        {
+            target = null;
+            if (!CanLocalPlayerSpectate) return false;
+
+            TeamRoster localRoster = GetRoster(LocalPlayerTeam);
+            return localRoster != null && localRoster.TryGetPreviousLivingMember(beforeSlotIndex, out target);
+        }
+
+        /// <summary>
+        /// 设置本地菜单是否临时阻塞对局输入。关闭菜单时会重新依据回合状态和玩家生命状态计算，
+        /// 不会简单地把玩法输入打开，从而避免死亡或准备阶段被 UI 绕过。
+        /// </summary>
+        /// <param name="blocked">true 表示菜单正在占用输入；false 表示释放阻塞并重新应用权威状态。</param>
+        public void SetPlayerMenuBlocked(bool blocked)
+        {
+            playerMenuBlocked = blocked;
+            ApplyPlayerGameplayEnabled();
+        }
+
         /// <summary>将阵营枚举映射到本场比赛的只读名册。</summary>
         /// <param name="team">要查询的阵营；None 返回 null。</param>
         private TeamRoster GetRoster(CombatTeam team)
@@ -369,6 +395,7 @@ namespace ProjectSun.FPS.Rounds
 
         private void OnPlayerDied()
         {
+            ApplyPlayerGameplayEnabled();
             if (state == RoundState.Active && AliveAttackerCount == 0)
                 FinishRound(RoundState.DefendersWin, "ATTACKERS ELIMINATED");
         }
@@ -398,11 +425,19 @@ namespace ProjectSun.FPS.Rounds
 
         private void SetPlayerGameplayEnabled(bool enabled)
         {
+            roundGameplayRequested = enabled;
+            ApplyPlayerGameplayEnabled();
+        }
+
+        private void ApplyPlayerGameplayEnabled()
+        {
             if (playerInstaller == null) return;
-            if (playerInstaller.Player != null) playerInstaller.Player.SetGameplayInputEnabled(enabled);
-            if (playerInstaller.Weapon != null) playerInstaller.Weapon.SetGameplayInputEnabled(enabled);
-            if (playerInstaller.Abilities != null) playerInstaller.Abilities.SetGameplayInputEnabled(enabled);
-            if (playerInstaller.TacticalEquipment != null) playerInstaller.TacticalEquipment.SetGameplayInputEnabled(enabled);
+            bool playerAlive = playerCombatant == null || playerCombatant.IsAlive;
+            bool effectiveEnabled = roundGameplayRequested && !playerMenuBlocked && playerAlive;
+            if (playerInstaller.Player != null) playerInstaller.Player.SetGameplayInputEnabled(effectiveEnabled);
+            if (playerInstaller.Weapon != null) playerInstaller.Weapon.SetGameplayInputEnabled(effectiveEnabled);
+            if (playerInstaller.Abilities != null) playerInstaller.Abilities.SetGameplayInputEnabled(effectiveEnabled);
+            if (playerInstaller.TacticalEquipment != null) playerInstaller.TacticalEquipment.SetGameplayInputEnabled(effectiveEnabled);
         }
 
         private void SetPlayerLoadoutEditingEnabled(bool enabled)
