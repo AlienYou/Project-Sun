@@ -30,6 +30,8 @@ namespace ProjectSun.FPS.World
         [SerializeField] private KeyCode scopeValidationKey = KeyCode.F7;
         [Tooltip("进入 WeaponLab 时是否自动恢复玩家、武器和训练靶；默认启用。")]
         [SerializeField] private bool resetOnStart = true;
+        [Tooltip("仅在确有内部测试需求时允许非 Development Build 使用 F6/F7 与自动重置；默认关闭，正式玩家流程不得启用。")]
+        [SerializeField] private bool allowTestControlsInRelease;
 
         [Header("Scope Validation")]
         [Tooltip("每个 Unity 画质档位执行的完整循环数；有效范围 1～5，默认 1。一次循环包含快速 ADS、后坐和切枪。")]
@@ -90,11 +92,14 @@ namespace ProjectSun.FPS.World
         {
             ResolveValidationReferences();
             SubscribeWeapon();
-            if (resetOnStart) ResetLab();
+            if (resetOnStart && DevelopmentControlsAllowed) ResetLab();
         }
 
         private void Update()
         {
+            // WeaponLab 会被保留在 Build Settings 供专项测试加载，因此 Release 下必须显式拒绝测试入口，
+            // 防止 F6/F7 或自动压力测试意外进入正式玩法路径。
+            if (!DevelopmentControlsAllowed) return;
             if (UnityEngine.Input.GetKeyDown(scopeValidationKey))
             {
                 if (ValidationRunning) StopScopeValidation();
@@ -105,6 +110,9 @@ namespace ProjectSun.FPS.World
             if (ValidationRunning) StopScopeValidation();
             ResetLab();
         }
+
+        private bool DevelopmentControlsAllowed =>
+            Application.isEditor || Debug.isDebugBuild || allowTestControlsInRelease;
 
         private void OnDisable()
         {

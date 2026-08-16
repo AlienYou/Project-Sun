@@ -1,6 +1,8 @@
 # Project Sun 迭代 A 任务卡
 
-状态：待执行。创建日期：2026-08-16。
+状态：已取消。创建日期：2026-08-16。实现日期：2026-08-16。调整日期：2026-08-17。
+
+> 范围调整说明：现阶段改为优先推进可玩原型，本卡已实现的构建入口、Validator、构建门禁和 EditMode 测试继续保留；尚未执行的故障注入、死亡观战完整签字、连续三回合、Windows 产物和日志审计不再阻塞原型开发，统一迁移至工程开发计划的 Gate 4。本文保留为历史实现记录，不再作为当前执行任务卡。
 
 ## 任务概览
 
@@ -155,15 +157,24 @@
 
 | 项目 | 结果 |
 | --- | --- |
-| 开始时间 | 待填写 |
-| 完成时间 | 待填写 |
+| 开始时间 | 2026-08-16 |
+| 完成时间 | 实现完成；运行验收未完成 |
 | Unity 版本 | `2022.3.51f1c1` |
-| C# 编译 | 待执行 |
-| EditMode | 待执行 |
-| PlayMode/人工观战验收 | 待执行 |
-| Windows Development Build | 待执行 |
-| 已知问题 | 待填写 |
-| 最终签字 | 待填写 |
+| C# 编译 | 通过：运行时 0 error；2 条第三方 `CharacterKinematics` CS0649 warning；新增 Editor/测试代码独立编译 0 error |
+| EditMode | 通过：Unity Test Runner EditMode 共 9/9 通过、0 失败、0 忽略；`ProjectValidatorTests` 与 `TeamRosterTests` 均全绿 |
+| PlayMode/人工观战验收 | 九步及连续三回合记录模板已补充；待人工执行 |
+| Windows Development Build | 菜单、门禁与报告已实现；实际产物启动及完整回合待验收 |
+| 已知问题 | Play Mode 死亡观战九步、连续三回合及 Windows Development Build 产物仍待验收；EditMode 原始截图待按验收报告命名规则归档 |
+| 最终签字 | 待 QA/关卡完成运行验收后签字 |
+
+### 本次实现摘要
+
+- `CombatSlice` 已调整为首个启用 Build Scene，`WeaponLab` 保留为第二专项测试场景，第三方展示场景已从启用列表移除。
+- 新增 `Project Sun > Validation > Validate Project`：检查固定 Unity 版本、Layer/Input 契约、Build Scenes、关键场景与资产、Missing Script、CombatSlice 唯一对象、双方六槽位和 URP Renderer Feature。校验默认只读且可重复调用。
+- 新增 `Project Sun > Build > Windows Development Build`：Error 阻断、Warning 入报告，输出目录显式选择并拒绝 Unity 受控目录，报告记录版本、时间、提交、场景、摘要和产物位置。
+- 新增 EditMode 测试覆盖场景顺序、Layer、槽位缺失/重复/越界、构建门禁和重复运行不改变场景布局。
+- WeaponLab 的 F6/F7 与自动重置现仅在 Editor、Development Build 或显式 Release 测试开关下可用。
+- 详细环境记录、逐步测试、证据规范、缺陷分级与签字条件见[迭代 A 验收规约与报告](../QA/迭代A验收报告.md)。任务卡不得用简略结论覆盖该报告中的逐项测试结果。
 
 ## 后续任务入口
 
