@@ -61,17 +61,17 @@ Project Sun 的目标是第一人称战术射击游戏。首个可玩的商业�
 1. 阵营名册与队伍槽位：玩家 + 5 名友军 Bot 对 6 名敌军 Bot，可替换为不同测试阵容。
 2. 攻守双方独立出生点组；每回合重置时按队伍槽位分配出生点。
 3. HUD 显示阵营、存活人数、比分、回合倒计时与结算信息。
-4. 死亡后等待回合结束；为后续观战、击杀播报和网络所有权预留状态接口。
+4. 死亡后进入只读己方观战；观战目标由规则层发布，并为击杀播报和未来网络所有权预留状态接口。
 5. 保持 `RoundManager` 作为规则权威，使爆破模式能复用回合基础设施。
 
-### 当前进行：稳定阵营名册与出生契约
+### 当前进行：6v6 对局表现闭环
 
 1. [已通过场景验收] 新增固定容量 `TeamRoster`：玩家固定为进攻方槽位 0，进攻方 Bot 映射槽位 1-5，防守方 Bot 映射槽位 0-5；存活统计和 Bot 选敌只读取名册，不再依赖不稳定的场景查找顺序。
 2. [已通过场景验收] 新增 `TeamSpawnGroup`，以同一槽位编号映射世界空间出生位置和朝向；回合准备阶段先写入角色控制器，再由 CharacterController / NavMeshAgent 各自的安全重置流程执行传送。
 3. [已执行并写入场景] `Project Sun > Setup 6v6 Team Elimination Bots` 已在 2026-08-10 为 CombatSlice 创建双方各 6 个出生锚点并写入 12 名成员的唯一槽位；再次执行不会覆盖已经人工调整的锚点姿态，同时支持 Undo、场景标脏与保存。
 4. [已实现测试；场景验收通过] 增加 EditMode 契约测试，覆盖名册槽位冲突、容量越界和出生姿态查询；测试程序集已通过编译，仍需在 Unity Test Runner 正式执行。CombatSlice 已确认 12 名成员的回合出生、重置和 NavMesh 路径表现正常。
 5. [已通过场景验收] HUD 使用 `TeamRoster` 绘制双方阵营名、存活数量和 6 个稳定槽位；存活、淘汰、空槽与本地玩家使用不同视觉状态，比分和回合倒计时仍由 `RoundManager` 提供。2026-08-10 已在 CombatSlice 确认显示与成员死亡状态同步。
-6. [已通过场景验收] 本地玩家死亡后隐藏准星、镜内/镜外瞄具表现和伤害提示，显示回合等待面板；`RoundManager.TryGetNextLocalSpectatorTarget` 只返回己方存活成员，为下一步观战摄像机提供不泄露敌方信息的稳定循环目标。
+6. [已通过场景验收] 本地玩家死亡后隐藏准星、镜内/镜外瞄具表现和伤害提示，显示回合等待面板；`RoundManager.TryGetNextLocalSpectatorTarget` 只返回己方存活成员，为观战摄像机提供不泄露敌方信息的稳定循环目标。
 7. [已实现，待场景验收] 新增只读死亡观战摄像机：仅循环己方存活成员，默认使用左右方向键切换且可在设置中改键；第三人称相机按目标朝向平滑跟随，并对 Wall Layer 做球形防穿墙检测。观战期间独立接管 Base Camera 与 AudioListener，不渲染第一人称枪模；全队淘汰或回合结算时冻结最后画面，下一回合准备阶段无缝恢复玩家相机。设置菜单的输入阻塞也统一回到 `RoundManager` 判定，关闭菜单不会让死亡或准备阶段的玩家重新获得移动和射击输入。
 8. [下一步] 制作击杀事件数据、击杀播报与正式回合结算面板；事件层保持与 HUD 解耦，为未来服务器权威同步预留接口。
 
@@ -102,6 +102,6 @@ Project Sun 的目标是第一人称战术射击游戏。首个可玩的商业�
 - `SOCKET_Scope` 负责瞄具安装，`Model` 负责资源挂载修复，`AimAnchor` 是 ADS 光轴参考，`LensAnchor` 只负责倍镜后镜片画面与口径。
 - 每个第一人称附件都必须经过腰射、ADS、Clip Probe 和运行时装配验证。
 
-详细资源与校准步骤见 [WeaponAttachmentViewmodelAuthoring.md](WeaponAttachmentViewmodelAuthoring.md)。后续范围或优先级变更时，应先更新本文件，再进入实现。
+详细资源与校准步骤见[武器配件第一人称表现规范](Authoring/WeaponAttachmentViewmodelAuthoring.md)。后续范围或优先级变更时，应先更新本文件，再进入实现。
 
-6v6 名册、槽位与出生点制作流程见 [TeamRosterAndSpawnAuthoring.md](TeamRosterAndSpawnAuthoring.md)。
+6v6 名册、槽位、出生点与观战验收流程见[6v6 阵营名册与出生点制作规范](Authoring/TeamRosterAndSpawnAuthoring.md)。全部现行文档和权威顺序见[文档中心](README.md)。
