@@ -17,7 +17,7 @@ MonoBehaviour:
   sightReferenceLocalOffset: {x: -0.00095445535, y: 0.05820093, z: 0.0013896711}
   cameraSpacePositionOffset: {x: 0, y: 0, z: 0}
   cameraSpaceRotationOffset: {x: 12.15, y: 0, z: 0}
-  visualSightPlacementReviewed: 1
+  visualSightPlacementReviewed: 0
   hipCameraSpacePositionOffset: {x: 0, y: 0, z: 0.18}
   hipCameraSpaceRotationOffset: {x: 0, y: 0, z: 0}
   transitionSpeed: 7

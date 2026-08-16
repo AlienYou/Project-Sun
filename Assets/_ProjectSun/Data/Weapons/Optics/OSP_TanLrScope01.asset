@@ -13,12 +13,12 @@ MonoBehaviour:
   m_Name: OSP_TanLrScope01
   m_EditorClassIdentifier: Assembly-CSharp:ProjectSun.FPS.Weapons:OpticSightProfile
   sightType: 2
-  fallbackReticleStyle: 3
+  fallbackReticleStyle: 1
   reticleTexture: {fileID: 0}
-  reticleColor: {r: 0.12, g: 0.96, b: 0.2, a: 0.9}
+  reticleColor: {r: 1, g: 0, b: 0, a: 0.9}
   reticleSizePixels: 3
-  frameSizePixels: 52
-  magnification: 4
+  frameSizePixels: 22
+  magnification: 12
   lensViewportScale: 0.68
   outsideLensDim: 0.35
   outsideLensBlurPixels: 2
