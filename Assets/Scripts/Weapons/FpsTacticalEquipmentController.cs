@@ -134,12 +134,17 @@ namespace ProjectSun.FPS.Weapons
                 return false;
             }
 
-            GameObject mineObject = new GameObject(activeDefinition.displayName + " (Deployed)");
-            mineObject.transform.SetPositionAndRotation(hit.point + hit.normal * 0.025f,
+            GameObject mineObject = TryInstantiateEquipmentActor("Deployed", hit.point + hit.normal * 0.025f,
                 Quaternion.FromToRotation(Vector3.up, hit.normal));
-            mineObject.layer = CombatLayers.IgnoreRaycastLayer;
-            ProximityMine mine = mineObject.AddComponent<ProximityMine>();
-            mine.Configure(activeDefinition, gameObject, OnMineResolved);
+            if (mineObject == null) return false;
+
+            ProximityMine mine = mineObject.GetComponent<ProximityMine>();
+            if (mine == null || !mine.Configure(activeDefinition, gameObject, OnMineResolved))
+            {
+                ReportInvalidActor(mineObject, "ProximityMine");
+                Destroy(mineObject);
+                return false;
+            }
             activeEquipmentActors.Add(mineObject);
             return true;
         }
@@ -154,15 +159,55 @@ namespace ProjectSun.FPS.Weapons
 
             Transform cameraTransform = playerCamera.transform;
             Vector3 spawnPosition = cameraTransform.position + cameraTransform.forward * 0.45f + cameraTransform.up * -0.08f;
-            GameObject grenadeObject = new GameObject(activeDefinition.displayName + " (Thrown)");
-            grenadeObject.transform.SetPositionAndRotation(spawnPosition, cameraTransform.rotation);
-            grenadeObject.layer = CombatLayers.IgnoreRaycastLayer;
-            FragGrenade grenade = grenadeObject.AddComponent<FragGrenade>();
+            GameObject grenadeObject = TryInstantiateEquipmentActor("Thrown", spawnPosition, cameraTransform.rotation);
+            if (grenadeObject == null) return false;
+
+            FragGrenade grenade = grenadeObject.GetComponent<FragGrenade>();
             Vector3 initialVelocity = cameraTransform.forward * activeDefinition.throwSpeed +
                 cameraTransform.up * activeDefinition.throwUpwardSpeed;
-            grenade.Configure(activeDefinition, gameObject, initialVelocity, OnGrenadeResolved);
+            if (grenade == null || !grenade.Configure(activeDefinition, gameObject, initialVelocity, OnGrenadeResolved))
+            {
+                ReportInvalidActor(grenadeObject, "FragGrenade");
+                Destroy(grenadeObject);
+                return false;
+            }
             activeEquipmentActors.Add(grenadeObject);
             return true;
+        }
+
+        /// <summary>
+        /// 实例化当前装备声明的项目 Prefab，并统一设为不参与玩家瞄准查询的运行时层。
+        /// </summary>
+        /// <param name="stateSuffix">附加在实例名称末尾的状态文本，仅用于 Hierarchy 与调试定位。</param>
+        /// <param name="worldPosition">Actor 初始世界坐标，单位米。</param>
+        /// <param name="worldRotation">Actor 初始世界旋转；部署物会对齐命中表面，投掷物对齐相机方向。</param>
+        /// <returns>成功创建的 Actor；定义或 Prefab 缺失时返回空且更新 HUD 状态。</returns>
+        private GameObject TryInstantiateEquipmentActor(string stateSuffix, Vector3 worldPosition, Quaternion worldRotation)
+        {
+            if (activeDefinition == null || activeDefinition.worldPrefab == null)
+            {
+                statusLabel = "MISSING TACTICAL PREFAB";
+                Debug.LogError($"{name} cannot use tactical equipment because its project worldPrefab is missing.", activeDefinition);
+                return null;
+            }
+
+            GameObject actor = Instantiate(activeDefinition.worldPrefab, worldPosition, worldRotation);
+            actor.name = $"{activeDefinition.displayName} ({stateSuffix})";
+            // 战术 Actor 仍可与世界碰撞，但不应被武器瞄准射线当作角色或墙体命中目标。
+            CombatLayers.SetLayerRecursively(actor, CombatLayers.IgnoreRaycastLayer);
+            return actor;
+        }
+
+        /// <summary>
+        /// 报告 Prefab 与装备类型不匹配的配置错误。
+        /// </summary>
+        /// <param name="actor">已实例化但无法配置的 Actor；用于在 Unity Console 中定位 Prefab 来源。</param>
+        /// <param name="requiredComponentName">当前投放路径必需的组件名称，例如 FragGrenade。</param>
+        private void ReportInvalidActor(GameObject actor, string requiredComponentName)
+        {
+            statusLabel = "INVALID TACTICAL PREFAB";
+            Debug.LogError($"{name} requires {activeDefinition.displayName} worldPrefab to contain {requiredComponentName} and valid presentation components.",
+                actor != null ? actor : activeDefinition);
         }
 
         private bool TryGetDeploySurface(out RaycastHit hit)

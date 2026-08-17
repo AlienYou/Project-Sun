@@ -16,6 +16,8 @@ MonoBehaviour:
   description: Deploys an armed proximity mine that detonates when an enemy enters
     its trigger radius.
   type: 1
+  worldPrefab: {fileID: 2245378783497512813, guid: 338e7cc5412d3154bab0a91bbfd20065,
+    type: 3}
   cooldownSeconds: 12
   maxCharges: 1
   deployRange: 4.5

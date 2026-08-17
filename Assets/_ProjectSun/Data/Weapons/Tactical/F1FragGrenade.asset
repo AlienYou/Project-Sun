@@ -15,6 +15,8 @@ MonoBehaviour:
   displayName: F-1 FRAG GRENADE
   description: Throws a bouncing grenade that detonates after a short fuse.
   type: 0
+  worldPrefab: {fileID: 4295456896000315295, guid: dd572968db9631b40bb3d4cf017bf4d0,
+    type: 3}
   cooldownSeconds: 14
   maxCharges: 1
   deployRange: 4.5
